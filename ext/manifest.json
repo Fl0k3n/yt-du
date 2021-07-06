@@ -1,0 +1,26 @@
+{
+    "manifest_version": 2,
+    "name": "yt-du",
+    "version": "0.0.1",
+    "permissions": [
+        "tabs",
+        "storage",
+        "webRequest",
+        "<all_urls>"
+    ],
+    "background": {
+        "scripts": [
+            "background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.youtube.com/*"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ]
+}
