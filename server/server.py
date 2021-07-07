@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import json
 import os
+from pathlib import Path
 
 PLAYLIST_FAILED_CODE = 1
 PLAYLIST_SUCCEEDED_CODE = 2
@@ -16,7 +17,7 @@ playlists = {'playlists': [playlist]}
 
 
 def on_links_rcvd(playlist, links):
-    playlist_path = '../test_playlist'
+    playlist_path = Path(__file__).parent.joinpath('test_playlist')
     try:
         os.mkdir(playlist_path)
     except FileExistsError as e:
@@ -30,8 +31,8 @@ def on_links_rcvd(playlist, links):
         sub_link1, sub_link2 = link_data['dataLinks']
 
         if os.fork() == 0:
-            os.execl(DOWNLOADER_SCRIPT_NAME, DOWNLOADER_SCRIPT_NAME,
-                     playlist, playlist_path, link, title, sub_link1, sub_link2)
+            os.execlp('python', DOWNLOADER_SCRIPT_NAME, DOWNLOADER_SCRIPT_NAME,
+                      playlist, playlist_path, link, title, sub_link1, sub_link2)
         else:
             # TODO some data structure to add all pids
             # separate thread for waiting? or even this thing in separate thread or even process
