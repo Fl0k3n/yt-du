@@ -1,58 +1,70 @@
 import asyncio
 import websockets
 import json
-from requests_html import AsyncHTMLSession
+import os
 
-
-# class Prepocessor:
-#     def __init__(self):
-#         self.playlists = [
-#             "https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX"]
-
-#         self.asession = AsyncHTMLSession()
-
-#     async def get_json_playlists(self):
-#         data = [{
-#             'url': purl,
-#             'size': await self._get_playlist_size(purl)
-#         } for purl in self.playlists]
-
-#         return json.dumps({'playlists': data})
-
-#     async def _get_playlist_size(self, url):
-#         cookies = {'CONSENT': 'YES+PL.pl+20150816-15-0', 'VISITOR_INFO1_LIVE': 'oH8ywplOVLc', 'HSID': 'ACK8uKqXLXcZRuBEF', 'SSID': 'A0B6v1UnJS2So2jU8', 'APISID': 'GiEjOJBPlXqn0MJf/AOQgfs-R-gxb5_Tfh', 'SAPISID': 'hyGZwn8JFGOgvJOP/AVJakpzEJnV9uJFzC', '__Secure-3PAPISID': 'hyGZwn8JFGOgvJOP/AVJakpzEJnV9uJFzC', 'LOGIN_INFO': 'AFmmF2swRAIgXPhEzoJfIPhalCyKbhjOnc2LEzr9-p0aGNxylkCGfuACIHN41m05mqw4eJobluABOzHN4dNUCgEQ5kPRh7XGP8Ga:QUQ3MjNmd09ySUZ3SFZ5OURUUUJwWElaQkFxemFhNHowc1pLVmxickUxT0NQMk1pVlpleDRVSVpjUEk4RGdXeUMxSkNKZy1NWVR2Z3NUQjZaSURMSjdEVEtfYTUtM0FMRGlDM1lITzVvX3ozYWNSWTZFd2FtM1hrSjljcHh5WDNmVEk2TVpneUo4dWxKeExwUkZLWjlVZEdXTW9OZVhqbVpQdUVKSDhqNzJtSnR4dmRGazhEbVl3',
-#                    'PREF': 'tz=Europe.Warsaw&f5=20000&hl=en', 'SID': '-werRUhyg5ssGlbXZCLXl2dofAQPspbmc035cUuC2xe1EYYJ3l-mhbDcZdJ_GtdfdYYPPA.', '__Secure-3PSID': '-werRUhyg5ssGlbXZCLXl2dofAQPspbmc035cUuC2xe1EYYJhufIv6PSiwSmRSqhuw0lCA.', 'YSC': '05q1Md_M4A0', 'SIDCC': 'AJi4QfE8UqgXQFNHBeshwJ1ZwSZqY5epD4Kqd4GCW6juBUMTa1l9y7A8gGAOmOW20R8Ulr87MH0', '__Secure-3PSIDCC': 'AJi4QfHnXLZ1fSOSiKEL7O_AGg9dr6KuiLqbxhObj1EsVHuQPpFoVjNrAnpFPP5uYMZfDWSCREc'}
-
-#         resp = await self.asession.get(url, cookies=cookies)
-#         html = resp.html.find("body", first=True)
-#         with open('tmp.html', 'wb') as f:
-#             f.write(html.raw_html)
-#         # print(html.raw_html)
-#         # html = resp.html.find(
-#         #     '#header-contents .ytd-playlist-panel-renderer .index-message', first=True)
-#         # print(html.text)
-
-
-# async def main():
-#     preproc = Prepocessor()
-#     await preproc.get_json_playlists()
-
-# asyncio.run(main())
-
-
+PLAYLIST_FAILED_CODE = 1
+PLAYLIST_SUCCEEDED_CODE = 2
+DOWNLOADER_SCRIPT_NAME = 'yt_dl.py'
 PORT = 5555
 
 
 playlist = "https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX"
+playlist2 = "https://www.youtube.com/watch?v=IlQlKiPgBNk&list=PLmIOcjWlMZTL4qMZGua0xwXbRSSBu-m2r"
 playlists = {'playlists': [playlist]}
+# playlists = {'playlists': [playlist, playlist2]}
+
+
+def on_links_rcvd(playlist, links):
+    playlist_path = '../test_playlist'
+    try:
+        os.mkdir(playlist_path)
+    except FileExistsError as e:
+        print(
+            f'For playlist {playlist} directory at {playlist_path} already exists')
+        # TODO check if all/what was downloaded
+
+    for link_data in links:
+        title = link_data['title']
+        link = link_data['link']
+        sub_link1, sub_link2 = link_data['dataLinks']
+
+        if os.fork() == 0:
+            os.execl(DOWNLOADER_SCRIPT_NAME, DOWNLOADER_SCRIPT_NAME,
+                     playlist, playlist_path, link, title, sub_link1, sub_link2)
+        else:
+            # TODO some data structure to add all pids
+            # separate thread for waiting? or even this thing in separate thread or even process
+            pass
+
+
+def on_msg_rcvd(data):
+    playlist = data['playlist']
+    code = data['code']
+
+    if code == PLAYLIST_SUCCEEDED_CODE:
+        on_links_rcvd(playlist, data['data'])
+    else:
+        print("ERRRS")
+        print(f"FOR Playlist {data['playlist']} got code: {data['code']}")
+    # at playlist name (given)
+    # create directory
+    # for each link spawn worker and download
+    # wait for all to finish and run next playlist
+    # let every child log progress
+    # in case of errors log in file that this item has failed
 
 
 async def on_connected(ws, path):
-    for playlist in playlists:
-        await ws.send(json.dumps(playlists))
-        links = await(ws.recv())
-        print(links)
-    print('done.')
+    await ws.send(json.dumps(playlists))
+    size = len(playlists['playlists'])
+
+    for i in range(size):
+        # add timeout in case of failure and send new request then
+        #
+        links = await ws.recv()
+        data = json.loads(links)
+        on_msg_rcvd(data)
 
 server = websockets.serve(on_connected, "127.0.0.1", PORT)
 print(f'listenning on {PORT}')
