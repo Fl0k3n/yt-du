@@ -7,6 +7,7 @@ from pathlib import Path
 import urllib
 import random
 from enum import Enum
+import time
 
 PARENT_DIR = Path(__file__).parent.absolute()
 TMP_DIR = Path.joinpath(PARENT_DIR, '.tmp')
@@ -17,6 +18,26 @@ def _get_re_group(reg, data, idx, default):
         return re.search(reg, data).group(idx)
     except (AttributeError, IndexError):
         return default
+
+
+def try_del(name, func=os.remove, msg="Failed to cleanup"):
+    try:
+        func(name)
+    except Exception as e:
+        print(msg)
+        print(type(e), e)
+
+
+class UnsupportedURLError(Exception):
+    """Raised when url couldn't have been parsed for downloading"""
+
+    def __init__(self, url, failed_param, msg='Unsupported url format.'):
+        self.url = url
+        self.failed_param = failed_param
+        self.msg = msg
+
+    def __str__(self):
+        return f'{self.msg}\nFailed for [{self.url}], param [{self.failed_param}] not found.'
 
 
 class CircularBuffer:
@@ -61,6 +82,8 @@ class Codes(Enum):
 
 
 class YTDownloader:
+    _MAX_CHUNK_SIZE = 10 * 1024 * 1024 - 1  # bytes
+
     def __init__(self, playlist, path, link, title, data_links, retries=3, verbose=True):
         """
         Args:
@@ -108,36 +131,85 @@ class YTDownloader:
         self.thread_status = [0] * len(self.data_links)
 
         self.threads = [threading.Thread(target=self._fetch, args=(link, file_name, i))
-                        for i, (link, file_name) in enumerate(zip(self.data_links, self.file_names))]
+                        for i, (link, file_name) in enumerate(
+            zip(self.data_links, self.file_names))]
+
+    def _get_content_length(self, link):
+        clen_re = r'(?<=(?:\?|&)clen=)(\d+)'
+        matches = re.search(clen_re, link)
+
+        if not matches:
+            raise UnsupportedURLError(link, 'clen')
+
+        return int(matches.group(0))
+
+    def _gen_chunk_links(self, link):
+        clen = self._get_content_length(link)
+        range_start = 0
+        range_end = self._MAX_CHUNK_SIZE - 1
+
+        range_re = re.compile(r'(?<=(?:\?|&)range=)(\d+-\d+)')
+        if not range_re.search(link):
+            raise UnsupportedURLError(link, 'range')
+
+        end_found = False
+
+        while not end_found:
+            if range_end >= clen:
+                range_end = clen - 1
+                end_found = True
+
+            # would be more efficient to just find index of it, left for readability
+            chunk_link = range_re.sub(f'{range_start}-{range_end}', link)
+            yield chunk_link
+            range_start = range_end + 1
+            range_end += self._MAX_CHUNK_SIZE
 
     def _fetch(self, link, out_file_path, idx):
+        """fetches data links in _MAX_CHUNK sizes then merges them"""
         if self.verbose:
             print(f"[{self.title}] Fetching: {link[:150]}...")
 
-        # TODO persistent retries?
-        retried = 0
-        while True:
-            try:
-                with open(out_file_path, 'wb') as f:
-                    r = requests.get(link, stream=True)
+        tmp_file_path = f'{out_file_path}_{idx}'
 
-                    if not 200 <= r.status_code < 300:
-                        raise ValueError(
-                            f'Request code was {r.status_code}\n HEADERS: {r.headers}')
+        try:
+            with open(out_file_path, 'wb') as f:
+                for i, chunk_link in enumerate(self._gen_chunk_links(link)):
+                    retried = 0
+                    while True:
+                        try:
+                            with open(tmp_file_path, 'wb') as tmp_f:
+                                r = requests.get(chunk_link, stream=True)
 
-                    for chunk in r.raw:
-                        f.write(chunk)
+                                if not 200 <= r.status_code < 300:
+                                    raise ValueError(
+                                        f'CHUNK: {i} STATUS: {r.status_code}\n HEADERS: {r.headers}')
 
-                self.thread_status[idx] = Codes.SUCCESS
-                break
-            except Exception as e:
-                print("Failed to fetch.")
-                print(type(e), e)
+                                for chunk in r.raw:
+                                    tmp_f.write(chunk)
 
-                if retried == self.retries:
-                    self.thread_status[idx] = Codes.FETCH_FAILED
-                    break
-                retried += 1
+                            # ok chunk read without errors rewrite it to output file
+                            with open(tmp_file_path, 'rb') as tmp_f:
+                                f.write(tmp_f.read())
+
+                            break
+                        except Exception as e:
+                            print("Failed to fetch.")
+                            print(type(e), e)
+
+                            if retried == self.retries:
+                                self.thread_status[idx] = Codes.FETCH_FAILED
+                                try_del(tmp_file_path)
+                                return
+                            retried += 1
+        except UnsupportedURLError as e:
+            # TODO log it
+            print(e)
+            self.thread_status[idx] = Codes.FETCH_FAILED
+
+        try_del(tmp_file_path)
+
+        self.thread_status[idx] = Codes.SUCCESS
 
     def _merge_tmp_files(self, accept_all_msgs=True):
         if self.verbose:
@@ -203,13 +275,6 @@ class YTDownloader:
                 b''.join(full_err_log).decode()
 
     def _clean_up(self):
-        def try_del(name, func):
-            try:
-                func(name)
-            except Exception as e:
-                print("Failed to cleanup.")
-                print(type(e), e)
-
         for fname in self.file_names:
             try_del(fname, lambda x: os.remove(x))
 
@@ -217,8 +282,12 @@ class YTDownloader:
             try_del(dname, lambda x: os.rmdir(x))
 
     def download(self):
+        """returns True iff downloaded succesfully and ffmpeg stderr log"""
+
         for thread in self.threads:
             thread.start()
+
+        t_start = time.time()
 
         status = Codes.SUCCESS  # no errors yet
 
@@ -228,11 +297,26 @@ class YTDownloader:
             if self.thread_status[i] != Codes.SUCCESS:
                 status = self.thread_status[i]
                 print(
-                    f"Aborting, failed to download {self.title}\n{self.data_links[i]}")
+                    f"[{self.title}] Aborting, failed to download \n{self.data_links[i]}")
                 break
+
+        t_end = time.time()
+
+        if status == Codes.SUCCESS and self.verbose:
+            total_c_size = sum(self._get_content_length(dl)
+                               for dl in self.data_links)
+
+            size = round(total_c_size / 1048576 * 100) / 100  # MB
+            t_taken = round((t_end - t_start) * 100) / 100
+
+            print(
+                f"[{self.title}] Fetched successfully. SIZE: {size}MB TIME: {t_taken}s")
 
         if status == Codes.SUCCESS:
             status, err_log = self._merge_tmp_files()
+
+        if status == Codes.SUCCESS and self.verbose:
+            print(f"[{self.title}] OK. Merged successfully.")
 
         self._clean_up()
         return status, err_log
@@ -253,7 +337,8 @@ def main():
         pass
 
     ytdl = YTDownloader(playlist, path, link, title, [
-                        data_link1, data_link2], verbose=False)
+                        data_link1, data_link2], verbose=True)
+
     status, err_log = ytdl.download()
 
     if status != Codes.SUCCESS:

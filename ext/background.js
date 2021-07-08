@@ -129,10 +129,16 @@ class LinkExtractor {
         }
 
         this.linksMap.set(playlist, {
-            links: new Map(), // those that are/were procecessed
+            // those that are/were procecessed
+            // url -> {
+            // linksArr: [string] // ready media links,
+            // requiredTypes: Set<string> // at init (audio, video), deleted once found}
+            links: new Map(),
+
             allLinks: [],
             done: 0, // how many are done
             waiting: 0, //how many are currently processed
+            reqLinks: 2 // how many data links are required for each video
         });
 
         this.playlists.push(playlist);
@@ -177,7 +183,10 @@ class LinkExtractor {
             }, tab => {
                 this.tabsMap.set(tab.id, playlistUrl);
                 this.tabId2Link.set(tab.id, url);
-                data.links.set(url, []);
+                data.links.set(url, {
+                    linksArr: [],
+                    requiredTypes: new Set(['audio', 'video'])
+                });
             });
         });
     }
@@ -200,8 +209,9 @@ class LinkExtractor {
     }
 
     _playlistReady(playlist, playlistData) {
-        const links = [...playlistData.links.entries()];
+        const links = [...playlistData.links.entries()].map(([link, { linksArr, _ }]) => [link, linksArr]);
         const titles = links.map(([link, _]) => this.link2title.get(link));
+
 
         this.communicationHandler.sendLinks(playlist, links, titles);
         this.linksMap.delete(playlist);
@@ -220,25 +230,33 @@ class LinkExtractor {
 
         // valid single link intercepted
         if (playlist && this._isValid(details.url)) {
-            const lmap = this.linksMap.get(playlist).links;
+            const { links: lmap, reqLinks } = this.linksMap.get(playlist);
             const link = this.tabId2Link.get(tabId);
-            // an leftover probably?
-            if (lmap == null || lmap.get(link).length == 2)
+            const { requiredTypes } = lmap.get(link);
+            // an leftover probably
+            if (lmap == null || requiredTypes.length == reqLinks)
                 return;
 
             try {
-                // swap params so single download will suffice
-                const clenRe = /clen=(\d+)/;
-                const clen = parseInt(details.url.match(clenRe)[1]);
-                const rangeRe = /range=0-\d+?/;
-                details.url = details.url.replace(rangeRe, `range=0-${clen - 1}`);
+                // // swap params so single download will suffice
+                // const clenRe = /clen=(\d+)/;
+                // const clen = parseInt(details.url.match(clenRe)[1]);
+                // const rangeRe = /range=0-\d+?/;
+                // details.url = details.url.replace(rangeRe, `range=0-${clen - 1}`);
 
                 // get associated data
                 const data = this.linksMap.get(playlist);
                 const url = this.tabId2Link.get(tabId);
 
                 // add data link to array associated with playlist's link
-                const linksArr = data.links.get(url);
+                const { linksArr, requiredTypes } = data.links.get(url);
+                const mimesRe = /mime=(\w+)/;
+                const type = details.url.match(mimesRe)[1];
+                if (requiredTypes.has(type))
+                    requiredTypes.delete(type);
+                else
+                    return;
+
                 linksArr.push(details.url);
                 counter++;
                 // got 2 links (audio + video) this playlist's link is done
