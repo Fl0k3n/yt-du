@@ -14,10 +14,14 @@ playlist = "https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk
 playlist2 = "https://www.youtube.com/watch?v=IlQlKiPgBNk&list=PLmIOcjWlMZTL4qMZGua0xwXbRSSBu-m2r"
 playlists = {'playlists': [playlist]}
 # playlists = {'playlists': [playlist, playlist2]}
+playlist_dir = {
+    playlist: 'Gothic_playlist',
+    playlist2: 'Stronghold_playlist'
+}
 
 
 def on_links_rcvd(playlist, links):
-    playlist_path = Path(__file__).parent.joinpath('test_playlist')
+    playlist_path = Path(__file__).parent.joinpath(playlist_dir[playlist])
     try:
         os.mkdir(playlist_path)
     except FileExistsError as e:
@@ -36,7 +40,7 @@ def on_links_rcvd(playlist, links):
         else:
             # TODO some data structure to add all pids
             # separate thread for waiting? or even this thing in separate thread or even process
-            pass
+            pid, status = os.wait()
 
 
 def on_msg_rcvd(data):
