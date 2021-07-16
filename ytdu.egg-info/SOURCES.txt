@@ -1,0 +1,17 @@
+setup.py
+backend/__init__.py
+backend/controller/__init__.py
+backend/model/__init__.py
+backend/model/db_models.py
+backend/subproc/__init__.py
+backend/subproc/server.py
+backend/subproc/smth.py
+backend/subproc/yt_dl.py
+backend/utils/__init__.py
+backend/utils/assets_loader.py
+backend/utils/ipc_codes.py
+backend/view/__init__.py
+ytdu.egg-info/PKG-INFO
+ytdu.egg-info/SOURCES.txt
+ytdu.egg-info/dependency_links.txt
+ytdu.egg-info/top_level.txt

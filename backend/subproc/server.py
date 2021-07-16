@@ -71,8 +71,10 @@ async def on_connected(ws, path):
         data = json.loads(links)
         on_msg_rcvd(data)
 
-server = websockets.serve(on_connected, "127.0.0.1", PORT)
-print(f'listenning on {PORT}')
 
-asyncio.get_event_loop().run_until_complete(server)
-asyncio.get_event_loop().run_forever()
+def main():
+    server = websockets.serve(on_connected, "127.0.0.1", PORT)
+    print(f'listenning on {PORT}')
+
+    asyncio.get_event_loop().run_until_complete(server)
+    asyncio.get_event_loop().run_forever()
