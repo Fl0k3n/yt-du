@@ -1,6 +1,11 @@
+from PyQt5.QtWidgets import QWidget
+from backend.view.playlist_list_item import PlaylistListItem
+from typing import Any
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, TIMESTAMP, Boolean
 from sqlalchemy.orm import relationship, backref, declarative_base
 from sqlalchemy.sql import func
+from model.displayable import Displayable
+
 
 Base = declarative_base()
 
@@ -15,7 +20,7 @@ merge_data_links = Table(
 )
 
 
-class Playlist(Base):
+class Playlist(Base, Displayable):
     """Contains top-level info about playlist, name should be filename at which it should be saved,
     url should be of the form: https://www.youtube.com/watch?v=...&list=...
     """
@@ -27,6 +32,9 @@ class Playlist(Base):
     added_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     finished_at = Column(TIMESTAMP, nullable=True)
     links = relationship("PlaylistLink", back_populates="playlist")
+
+    def to_data_list_item(self, parent: QWidget = None) -> PlaylistListItem:
+        return PlaylistListItem(self.name, self.url, self.directory_path, parent=parent)
 
 
 class PlaylistLink(Base):

@@ -1,3 +1,4 @@
+from typing import List
 from model.db_models import Base, Playlist
 from utils.assets_loader import AssetsLoader as AL
 from sqlalchemy import create_engine, select
@@ -28,3 +29,13 @@ class DBHandler:
 
     def get_playlist(self, url: str) -> Playlist:
         return self.session.query(Playlist).filter(Playlist.url == url).one_or_none()
+
+    def get_playlists(self, offset: int, limit: int) -> List[Playlist]:
+        return (self.session
+                .query(Playlist)
+                .order_by(Playlist.added_at.desc())
+                .offset(offset)
+                .limit(limit))
+
+    def get_playlist_count(self) -> int:
+        return self.session.query(Playlist).count()

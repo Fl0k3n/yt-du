@@ -4,6 +4,7 @@ from backend.utils.commands.command import CallRcvrCommand
 from backend.controller.playlist_manager import PlaylistManager
 from backend.controller.db_handler import DBHandler
 from backend.view.main_window import MainWindow
+from backend.controller.gui.data_summary_ctl import DataSummaryController
 
 
 class MainWindowController:
@@ -16,6 +17,9 @@ class MainWindowController:
 
         self.view = MainWindow(CallRcvrCommand(
             lambda: self._open_new_playlist_window()))
+
+        self.data_summary_ctl = DataSummaryController(
+            self.playlist_mgr, self.view.get_data_list())
 
     def show(self):
         self.view.show()

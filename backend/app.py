@@ -10,11 +10,11 @@ class App(QApplication):
     def __init__(self, argv: List[str], sql_debug: bool = True):
         super().__init__(argv)
         self.db = DBHandler(verbose=sql_debug)
+        self.db.connect()
         self.playlist_manager = PlaylistManager(self.db)
         self.main_window = MainWindowController(self.playlist_manager, self.db)
 
     def run(self):
-        self.db.connect()
         self.main_window.show()
 
     def stop(self):
