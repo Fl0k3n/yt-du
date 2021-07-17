@@ -1,3 +1,4 @@
+from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
 from backend.view.playlist_list_item import PlaylistListItem
 from typing import Any
@@ -33,8 +34,9 @@ class Playlist(Base, Displayable):
     finished_at = Column(TIMESTAMP, nullable=True)
     links = relationship("PlaylistLink", back_populates="playlist")
 
-    def to_data_list_item(self, parent: QWidget = None) -> PlaylistListItem:
-        return PlaylistListItem(self.name, self.url, self.directory_path, parent=parent)
+    def to_data_list_item(self, show_details_command: Command, parent: QWidget = None) -> PlaylistListItem:
+        return PlaylistListItem(self.name, self.url, self.directory_path,
+                                show_details_command=show_details_command, parent=parent)
 
 
 class PlaylistLink(Base):

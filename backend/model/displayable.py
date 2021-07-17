@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
 from view.data_list_item import DataListItem
 
@@ -7,5 +8,5 @@ from view.data_list_item import DataListItem
 
 class Displayable:
     @abstractmethod
-    def to_data_list_item(self, parent: QWidget) -> DataListItem:
+    def to_data_list_item(self, show_details_command: Command, parent: QWidget) -> DataListItem:
         pass
