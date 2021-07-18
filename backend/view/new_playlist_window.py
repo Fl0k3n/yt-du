@@ -24,6 +24,12 @@ class NewPlaylistWindow(QDialog):
 
         self.url_input, self.name_input, self.path_input = self.inputs
 
+        # TODO
+        self.url_input.setText(
+            'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX')
+        self.name_input.setText('GOTHIC TEST')
+        self.path_input.setText('/home/flok3n/music')
+
         btn_box = QWidget()
         self.layout.addWidget(btn_box)
 

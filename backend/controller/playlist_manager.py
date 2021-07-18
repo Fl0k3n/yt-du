@@ -1,3 +1,4 @@
+from backend.subproc.ipc.ipc_manager import IPCManager
 from typing import List
 from backend.controller.db_handler import DBHandler
 from backend.model.db_models import Playlist
@@ -5,8 +6,9 @@ from backend.controller.observers.playlist_modified_observer import PlaylistModi
 
 
 class PlaylistManager(PlaylistModifiedObserver):
-    def __init__(self, db: DBHandler):
+    def __init__(self, db: DBHandler, ipc_mgr: IPCManager):
         self.db = db
+        self.ipc_mgr = ipc_mgr
         self.loaded_playlists = []  # list of loaded playlists
         self.pl_map = {}  # playlist_url -> idx in list above
 
@@ -14,8 +16,8 @@ class PlaylistManager(PlaylistModifiedObserver):
         print('playlist added')
 
     def add_playlist(self, playlist: Playlist):
-        self.db.add_playlist(playlist)
-        print('added')
+        # self.db.add_playlist(playlist) TODO
+        self.ipc_mgr.query_playlist_links(playlist)
 
     def get_playlist(self, url: str) -> Playlist:
         stored = self._get_stored_playlist(url) if url in self.pl_map else \

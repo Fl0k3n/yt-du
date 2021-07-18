@@ -11,8 +11,10 @@ class Command(ABC):
 
 
 class CallRcvrCommand(Command):
-    def __init__(self, receiver: Callable[..., any]):
+    def __init__(self, receiver: Callable[..., any], *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
         self.receiver = receiver
 
     def execute(self):
-        self.receiver()
+        self.receiver(*self.args, **self.kwargs)

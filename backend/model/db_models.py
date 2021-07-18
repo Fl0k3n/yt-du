@@ -1,6 +1,7 @@
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
 from backend.view.playlist_list_item import PlaylistListItem
+from backend.view.link_list_item import LinkListItem
 from typing import Any
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, TIMESTAMP, Boolean
 from sqlalchemy.orm import relationship, backref, declarative_base
@@ -39,7 +40,7 @@ class Playlist(Base, Displayable):
                                 show_details_command=show_details_command, parent=parent)
 
 
-class PlaylistLink(Base):
+class PlaylistLink(Base, Displayable):
     """Info about specific playlist item, title will be used as filename"""
     __tablename__ = 'playlist_links'
     link_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -48,11 +49,16 @@ class PlaylistLink(Base):
     title = Column(Text, nullable=False)
     playlist_id = Column(Integer, ForeignKey(
         'playlists.playlist_id'), nullable=False)
-    cleaned_up = Column(Boolean, default=False, nullable=False)
+    cleaned_up = Column(Boolean, nullable=False, default=False)
 
     playlist = relationship("Playlist", back_populates="links")
     data_links = relationship('DataLink', back_populates='link')
     merges = relationship('MergeData', back_populates='link')
+
+    def to_data_list_item(self, show_details_command: Command, parent: QWidget = None) -> LinkListItem:
+        path = self.playlist.directory_path
+        return LinkListItem(self.playlist_number, self.title, self.url, path,
+                            show_details_command=show_details_command, parent=parent)
 
 
 class DataLink(Base):
