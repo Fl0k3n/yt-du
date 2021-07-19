@@ -3,7 +3,7 @@ from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
 from view.data_list_item import DataListItem
 
-# should derive from ABC, deleated because of metaclass conficts
+# should derive from ABC, deleted because of metaclass conficts
 
 
 class Displayable:

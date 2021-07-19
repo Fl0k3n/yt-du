@@ -59,11 +59,11 @@ title = 'Śniący!!! Zbudź się!!!'
 
 playlist_name = 'gothic'
 
-path = '/home/flok3n/dev/pythons/yt-du/server'
+path = '/home/flok3n/ytdl/sniacy_zbudz_sie.mp4'
 
-u1 = 'https://r3---sn-x2pm-f5fl.googlevideo.com/videoplayback?expire=1625777945&ei=uRLnYMuCLcityAWqxKFA&ip=185.25.121.191&id=o-ANO02kH0dMWC7YQndYl-KC9HXHlhMzVYlCKEhmvUl9s3&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C271%2C278%2C313%2C394%2C395%2C396%2C397%2C398%2C399%2C400%2C401&source=youtube&requiressl=yes&mh=w8&mm=31%2C29&mn=sn-x2pm-f5fl%2Csn-u2oxu-f5fe6&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=2311250&vprv=1&mime=video%2Fmp4&ns=zDVRbmqzdaRLiEAcoXRt9g8G&gir=yes&clen=26146741&dur=167.440&lmt=1598961457118132&mt=1625755980&fvip=4&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=7aJ1kR7fz6lbeA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhANvynZYopRnQ2xM3a0oagqR5_dX8IT5BL_vk-P0ovwZfAiEArZrNU7_CHjFN6b0oNVzWl-w3I7d38NxGqlH6ja4ZxM4%3D&alr=yes&sig=AOq0QJ8wRgIhAMN3qAzfAbuq5XQJO4QjSB-1cjAOz46WbM7kvOwUd7JVAiEAkbAcmfYL-0JzNvSK2fjrL0pXP7CVuEjvG3f7PA_SdBM%3D&cpn=WymqvN0u7TL83Rrz&cver=2.20210701.07.00&range=0-509174&rn=1&rbuf=0'
+u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1626756501&ei=NQH2YKeOI87vyQXIsYOoBw&ip=185.25.121.191&id=o-AJzDX_zZYc9SyQQ3H0yarN1Nfgj1MoV7fyMApWSTBVbX&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pcm2cms=yes&pl=24&initcwndbps=1578750&vprv=1&mime=video%2Fmp4&ns=F2JXjm2jAK_NJ1cyfXAvEA0G&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1626734678&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=m_oaExrbl0dioA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIgGA7ahAnBOurxx6fIh29dQPmDTB-Gr4-0CMPXxugna-kCIQDvUYhXrjg7EyhlTKLv6Apmeu65k-YNXqaBvmNFS_Mr6A%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgLBGMUEDPL_b4ZP5Cpi-PqsG1lDneFOH3nRjhpSzTtdwCIQCXIubOpGFasPA7G1teD_WC-D2RTUTWP1gbL9pwWXdvhQ%3D%3D&alr=yes&cpn=RpxmakBrkfdouPKA&cver=2.20210719.00.00&range=0-63173&rn=1&rbuf=0'
 
-u2 = 'https://r3---sn-x2pm-f5fl.googlevideo.com/videoplayback?expire=1625777945&ei=uRLnYMuCLcityAWqxKFA&ip=185.25.121.191&id=o-ANO02kH0dMWC7YQndYl-KC9HXHlhMzVYlCKEhmvUl9s3&itag=251&source=youtube&requiressl=yes&mh=w8&mm=31%2C29&mn=sn-x2pm-f5fl%2Csn-u2oxu-f5fe6&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=2311250&vprv=1&mime=audio%2Fwebm&ns=zDVRbmqzdaRLiEAcoXRt9g8G&gir=yes&clen=2835999&dur=167.461&lmt=1596279636831978&mt=1625755980&fvip=4&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=7aJ1kR7fz6lbeA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAKImB1Lp-mnvCrG2VUP50XWOp7kJuTzo7zcQAaHqEpnzAiEAz5PJY893SmlDcSE1nidII9urUVpczr_lqpmpryzW2zc%3D&alr=yes&sig=AOq0QJ8wRQIhAMPosBo-RKCh9RgDqgBdXeCFqZTf1TTGiqGB_P-D6e0aAiBFCPcE2OeHISyr6bKM4UtMf0JtinWMEUSpHxWI1A-OSg%3D%3D&cpn=WymqvN0u7TL83Rrz&cver=2.20210701.07.00&range=0-66087&rn=2&rbuf=0'
+u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1626756501&ei=NQH2YKeOI87vyQXIsYOoBw&ip=185.25.121.191&id=o-AJzDX_zZYc9SyQQ3H0yarN1Nfgj1MoV7fyMApWSTBVbX&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pcm2cms=yes&pl=24&initcwndbps=1578750&vprv=1&mime=audio%2Fwebm&ns=F2JXjm2jAK_NJ1cyfXAvEA0G&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1626734678&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=m_oaExrbl0dioA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRAIgBZbm4_muWnLcv2rY7pApiwMCmt501TnnmKEkmTGOuaYCICPPlnlvdmXCiqMBfTckX0HqGWJyNXXsQVgP9s2VUmF2&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgLBGMUEDPL_b4ZP5Cpi-PqsG1lDneFOH3nRjhpSzTtdwCIQCXIubOpGFasPA7G1teD_WC-D2RTUTWP1gbL9pwWXdvhQ%3D%3D&alr=yes&cpn=RpxmakBrkfdouPKA&cver=2.20210719.00.00&range=0-65812&rn=2&rbuf=0'
 
 
 def _gen_chunk_links(link):
@@ -98,7 +98,7 @@ def _gen_chunk_links(link):
 
 if os.fork() == 0:
     os.execlp('python', 'python', './yt_dl.py',
-              playlist_name, path, link, title, u1, u2)
+              path, link, title, u1, u2)
 else:
     print(os.wait())
 

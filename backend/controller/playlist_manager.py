@@ -1,3 +1,4 @@
+from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
 from typing import Iterable, List
 from backend.controller.db_handler import DBHandler
@@ -5,6 +6,7 @@ from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 import urllib.parse as parse
+from model.dl_task import DlTask
 
 
 class PlaylistManager(PlaylistFetchedObserver):
@@ -69,16 +71,19 @@ class PlaylistManager(PlaylistFetchedObserver):
     def get_item_count(self) -> int:
         return self.db.get_playlist_count()  # + get_link_count?
 
-    def on_playlist_fetched(self, playlist_id: int, links: Iterable[str],
+    def on_playlist_fetched(self, playlist_id: int,
+                            playlist_idxs: Iterable[int],
+                            links: Iterable[str],
                             titles: Iterable[str],
                             data_links: Iterable[Iterable[str]]):
 
         playlist = self.get_playlist(id=playlist_id)
 
-        for i, (link, title, dlinks) in enumerate(zip(links, titles, data_links)):
+        for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
             pl_link = PlaylistLink(
-                playlist_number=i+1, url=link, title=title)
+                playlist_number=idx, url=link, title=title)
             pl_link.playlist = playlist
+            playlist.links.append(pl_link)
             self.db.add_pl_link(pl_link)
 
             for dlink in dlinks:
@@ -87,6 +92,13 @@ class PlaylistManager(PlaylistFetchedObserver):
                 self.db.add_data_link(dl)
 
         self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_links_added(playlist)
+
+        for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
+            path = self._get_video_path(playlist.directory_path, title, idx)
+            # self.ipc_mgr.schedule_dl_task(DlTask(path, link, dlinks)) ???
 
     def _create_data_link(self, url) -> DataLink:
         query = parse.urlparse(url).query
@@ -102,3 +114,13 @@ class PlaylistManager(PlaylistFetchedObserver):
         dl = DataLink(size=size, mime=mime, expire=expire)
 
         return dl
+
+    def _get_video_path(self, directory_path: str, title: str,
+                        playlist_idx: int = None) -> str:
+        dir = Path(directory_path)
+
+        filename = f'{title}.mp4'
+        if playlist_idx is not None:
+            filename = f'{playlist_idx}_{filename}'
+
+        return str(dir.joinpath(filename).absolute())

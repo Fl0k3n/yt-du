@@ -8,9 +8,9 @@ import urllib
 import random
 from enum import Enum
 import time
+from backend.utils.assets_loader import AssetsLoader as AL
 
 PARENT_DIR = Path(__file__).parent.absolute()
-TMP_DIR = Path.joinpath(PARENT_DIR, '.tmp')
 
 
 def _get_re_group(reg, data, idx, default):
@@ -82,25 +82,28 @@ class Codes(Enum):
 
 
 class YTDownloader:
-    _MAX_CHUNK_SIZE = 10 * 1024 * 1024 - 1  # bytes
+    # bytes, yt throttles chunks > 10MB (probably)
+    _MAX_CHUNK_SIZE = 10 * 1024 * 1024 - 1
+    TMP_DIR = Path(AL.get_env('TMP_FILES_PATH'))
 
-    def __init__(self, playlist, path, link, title, data_links, retries=3, verbose=True):
+    def __init__(self, path, link, data_links, title='unnamed', retries=3, verbose=True, cleanup=True):
         """
         Args:
-            playlist (string): playlist url
-            path (string): absolute path to directory where downloaded video should be saved
+            path (string): absolute path to file where downloaded video should be saved
             link (string): url to video to download
-            title (string): title of video
             data_links ([string]): array of data links, for now each video should have 2 (audio.webm + video.mp4)
+            title (string): title of video, needed only for logging
             retries (int): how many times download should be retried
+            verbose (bool): print status to stdout
+            cleanup (bool): delete individual media files after merge succeeds
         """
-        self.playlist = playlist
         self.path = path
         self.link = link
         self.title = title
         self.data_links = data_links
         self.retries = retries
         self.verbose = verbose
+        self.cleanup = cleanup
 
         self.playlist_idx = _get_re_group(r'index=(\d+)', link, 1, 0)
 
@@ -111,8 +114,13 @@ class YTDownloader:
 
     def _create_tmp_files_dir(self):
         try:
+            os.mkdir(self.TMP_DIR)
+        except FileExistsError:
+            pass
+
+        try:
             # increase chance of uniqueness
-            self.tmp_files_dir = Path.joinpath(TMP_DIR, f'{self.playlist_idx}_' + str(
+            self.tmp_files_dir = Path.joinpath(self.TMP_DIR, f'{self.playlist_idx}_' + str(
                 abs(hash(self.link))) + f'_{random.randint(1, 99)}')
             os.mkdir(self.tmp_files_dir)
         except FileExistsError:
@@ -220,10 +228,6 @@ class YTDownloader:
             files.append('-i')
             files.append(f)
 
-        out_file_name = f'{self.playlist_idx}_{self.title}.mp4'
-        out_full_path = str(Path.joinpath(
-            Path(self.path), out_file_name).absolute())
-
         full_err_log = []
 
         # TODO maybe higher-lvl api
@@ -243,7 +247,7 @@ class YTDownloader:
             os.dup2(IN_FMPEG, sys.stdin.fileno())
 
             os.execlp("ffmpeg", "ffmpeg", *files, '-c', 'copy',
-                      '-strict', 'experimental', out_full_path)
+                      '-strict', 'experimental', self.path)
         else:
             os.close(OUT_FMPEG)
             os.close(IN_FMPEG)
@@ -276,10 +280,10 @@ class YTDownloader:
 
     def _clean_up(self):
         for fname in self.file_names:
-            try_del(fname, lambda x: os.remove(x))
+            try_del(fname, os.remove)
 
         for dname in [self.tmp_files_dir]:
-            try_del(dname, lambda x: os.rmdir(x))
+            try_del(dname, os.rmdir)
 
     def download(self):
         """returns True iff downloaded succesfully and ffmpeg stderr log"""
@@ -318,26 +322,23 @@ class YTDownloader:
         if status == Codes.SUCCESS and self.verbose:
             print(f"[{self.title}] OK. Merged successfully.")
 
-        self._clean_up()
+        if self.cleanup:
+            self._clean_up()
+
         return status, err_log
 
 
 def main():
-    if len(sys.argv) != 7:
+    if len(sys.argv) != 6:
         print(
-            f'USAGE: ./{sys.argv[0]} playlist_name path video_url title data_link1 data_link2',
+            f'USAGE: ./{sys.argv[0]} result_path video_url title data_link1 data_link2',
             file=sys.stderr)
         sys.exit(1)
 
-    playlist, path, link, title, data_link1, data_link2 = sys.argv[1:]
+    path, link, title, data_link1, data_link2 = sys.argv[1:]
 
-    try:
-        os.mkdir(TMP_DIR)
-    except FileExistsError:
-        pass
-
-    ytdl = YTDownloader(playlist, path, link, title, [
-                        data_link1, data_link2], verbose=True)
+    ytdl = YTDownloader(path, link, [
+                        data_link1, data_link2], title=title, verbose=True, cleanup=True)
 
     status, err_log = ytdl.download()
 

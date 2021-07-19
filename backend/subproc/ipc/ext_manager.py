@@ -1,3 +1,4 @@
+import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
@@ -45,13 +46,24 @@ class ExtManager:
         self.msg_handlers[msg.code](msg)
 
     def _on_playlist_fetched(self, msg: Message):
-        from pprint import pprint
-        pprint(msg.data)
+        # TODO check if all was fetched
         playlist_id = msg.data['echo']['data']['db_id']
         links_data = msg.data['links']
 
-        links, titles, data_links = ([item[key] for item in links_data]
+        playlist_idxs = [(self._get_playlist_idx(item['link']), i)
+                         for i, item in enumerate(links_data)]
+
+        playlist_idxs.sort(key=lambda x: x[0])
+        sorted_ldata = [links_data[el[1]] for el in playlist_idxs]
+
+        links, titles, data_links = ([item[key] for item in sorted_ldata]
                                      for key in ['link', 'title', 'dataLinks'])
+        playlist_idxs = [x[0] for x in playlist_idxs]
 
         for obs in self.pl_fetched_obss:
-            obs.on_playlist_fetched(playlist_id, links, titles, data_links)
+            obs.on_playlist_fetched(
+                playlist_id, playlist_idxs, links, titles, data_links)
+
+    def _get_playlist_idx(self, url: str):
+        query = parse.urlparse(url).query
+        return int(parse.parse_qs(query)['index'][0])

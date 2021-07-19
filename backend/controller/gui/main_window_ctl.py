@@ -1,4 +1,5 @@
-from backend.model.db_models import Playlist
+from typing import Iterable
+from backend.model.db_models import Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.view.data_summary_box import DataSummaryBox
 from backend.controller.gui.new_playlist_ctl import NewPlaylistController
@@ -26,9 +27,13 @@ class MainWindowController(DataViewChanger, PlaylistModifiedObserver):
             lambda: self._open_new_playlist_window()))
 
         self.view_stack = [self.data_view]
+        self.data_view_changed_observers = [self.data_summary_ctl]
 
     def playlist_added(self, playlist: Playlist):
         self.data_summary_ctl.playlist_added(playlist)
+
+    def playlist_links_added(self, playlist: Playlist):
+        self.data_summary_ctl.playlist_links_added(playlist)
 
     def show(self):
         self.view.show()
@@ -53,6 +58,9 @@ class MainWindowController(DataViewChanger, PlaylistModifiedObserver):
 
         self.view_stack.pop()
         self._change_data_view(self.view_stack[-1])
+
+        for obs in self.data_view_changed_observers:
+            obs.on_changed_back()
 
     def change_forward(self):
         # TODO
