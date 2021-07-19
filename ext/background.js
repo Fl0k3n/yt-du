@@ -7,12 +7,18 @@ let retries = 10;
 let connEstb = false;
 let counter = 0;
 
-const PLAYLIST_FAILED_CODE = 1;
-const PLAYLIST_SUCCEEDED_CODE = 2;
+///////////////////////////////
+// ! keep it consistent with ipc_codes.py ExtCodes
+const CODES = {
+    FETCH_PLAYLIST: 1,
+    PLAYLIST_FAILED: 3,
+    PLAYLIST_FETCHED: 4
+}
+///////////////////////////////
 
 
 class ConnectionHandler {
-    constructor(port = 5555, retries = 10, connTimeout = 5) {
+    constructor(port = 5555, retries = 30, connTimeout = 1) {
         this.PORT = port;
         this.socket = null;
         this.retries = retries; //after retries retry time is doubled
@@ -24,15 +30,22 @@ class ConnectionHandler {
 
     init() {
         this.socket = new WebSocket(`ws://127.0.0.1:${this.PORT}`);
+        this.extractor = new LinkExtractor(this);
 
         this.socket.addEventListener('error', err => this.onError(err));
         this.socket.addEventListener('open', ev => this.onConnected(ev));
-        this.socket.addEventListener('message', e => {
-            console.log(`got ${e.data}`);
-            const data = JSON.parse(e.data);
-            const extractor = new LinkExtractor(this);
-            data['playlists'].forEach(playlist => extractor.addPlaylist(playlist));
-        });
+        this.socket.addEventListener('message', msg => this.onMsgRcvd(msg.data));
+    }
+
+    onMsgRcvd(msg) {
+        const msg_ob = JSON.parse(msg);
+        console.log("GOT MSG: ", msg_ob);
+        const code = msg_ob['code'];
+        const data = msg_ob['data'];
+        if (code == CODES.FETCH_PLAYLIST)
+            this.extractor.addPlaylist(data['url'], msg_ob);
+        else
+            console.log('Rcvd unsupported msg type', msg);
     }
 
     onError(err) {
@@ -57,25 +70,36 @@ class ConnectionHandler {
         console.log('connected', ev);
     }
 
-    _sendData(playlist, code, data) {
-        this.socket.send(JSON.stringify({
+    _sendData(playlist, code, data, echo) {
+        const msg_data = {
+            ...data,
             playlist: playlist,
+        };
+
+        if (echo != null)
+            msg_data['echo'] = echo;
+
+        console.log(msg_data);
+
+        this.socket.send(JSON.stringify({
             code: code,
-            data: data
+            data: msg_data
         }));
     }
 
-    sendLinks(playlist, links, titles) {
-        const data = links.map(([link, dataLinks], idx) => {
-            return {
-                link: link,
-                title: titles[idx],
-                dataLinks: dataLinks
-            };
-        });
+    sendLinks(playlist, links, titles, echo) {
+        const data = {
+            links: links.map(([link, dataLinks], idx) => {
+                return {
+                    link: link,
+                    title: titles[idx],
+                    dataLinks: dataLinks
+                };
+            })
+        };
 
-        this._sendData(playlist, PLAYLIST_SUCCEEDED_CODE, data);
-        console.log("sending ", data);
+        this._sendData(playlist, CODES.PLAYLIST_FETCHED, data, echo);
+        console.log("sending ", data, echo);
     }
 
     sendFailureMsg(playlist, code, reason) {
@@ -117,12 +141,12 @@ class LinkExtractor {
                     this._openPlaylistTabs(req.playlist, plData.allLinks.slice(0, this.MAX_BATCH_TABS));
                 }
                 else
-                    this.communicationHandler.sendFailureMsg(req.playlist, PLAYLIST_FAILED_CODE, req.reason);
+                    this.communicationHandler.sendFailureMsg(req.playlist, CODES.PLAYLIST_FAILED, req.reason);
             }
         });
     }
 
-    addPlaylist(playlist) {
+    addPlaylist(playlist, echo) {
         if (this.linksMap.has(playlist)) {
             console.log(`playlist ${playlist} already queued`);
             return;
@@ -136,6 +160,7 @@ class LinkExtractor {
             links: new Map(),
 
             allLinks: [],
+            echo: echo, // original request data
             done: 0, // how many are done
             waiting: 0, //how many are currently processed
             reqLinks: 2 // how many data links are required for each video
@@ -213,7 +238,7 @@ class LinkExtractor {
         const titles = links.map(([link, _]) => this.link2title.get(link));
 
 
-        this.communicationHandler.sendLinks(playlist, links, titles);
+        this.communicationHandler.sendLinks(playlist, links, titles, playlistData.echo);
         this.linksMap.delete(playlist);
 
         // pop queue

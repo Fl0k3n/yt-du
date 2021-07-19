@@ -1,3 +1,5 @@
+from backend.model.db_models import Playlist
+from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.view.data_summary_box import DataSummaryBox
 from backend.controller.gui.new_playlist_ctl import NewPlaylistController
 import PyQt5
@@ -9,7 +11,7 @@ from backend.controller.gui.data_summary_ctl import DataSummaryController
 from controller.gui.view_changer import DataViewChanger
 
 
-class MainWindowController(DataViewChanger):
+class MainWindowController(DataViewChanger, PlaylistModifiedObserver):
     def __init__(self, playlist_manager: PlaylistManager, db: DBHandler):
         self.playlist_mgr = playlist_manager
         self.db = db
@@ -24,6 +26,9 @@ class MainWindowController(DataViewChanger):
             lambda: self._open_new_playlist_window()))
 
         self.view_stack = [self.data_view]
+
+    def playlist_added(self, playlist: Playlist):
+        self.data_summary_ctl.playlist_added(playlist)
 
     def show(self):
         self.view.show()

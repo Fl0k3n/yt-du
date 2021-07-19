@@ -30,6 +30,10 @@ class DataSummaryBox(QFrame):
             self.visible_widgets.append(item)
             self.inner_layout.addWidget(item)
 
+    def append_top(self, item: DataListItem):
+        # TODO
+        self.show_all([item, *self.visible_widgets])
+
     def set_scrollable_size(self, size: int):
         self.inner_widget.setMinimumHeight(size)
 

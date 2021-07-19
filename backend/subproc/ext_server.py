@@ -103,10 +103,8 @@ class ExtServer:
         print('-----------------------WS Connected-----------------')
         while True:
             task = await self._get_task()
-            print('got task', task)
             if task.code == ExtCodes.FETCH_PLAYLIST:
-                msg = json.dumps({'playlists': [task.data]})
-                await ws.send(msg)
+                await ws.send(task.to_json())
                 resp = await ws.recv()
                 self._on_ext_msg_rcvd(resp)
             else:
@@ -115,15 +113,8 @@ class ExtServer:
             self.tasks.popleft()
 
     def _on_ext_msg_rcvd(self, json_msg):
-        msg = json.loads(json_msg)
-        code = msg['code']
-        data = msg['data']
-
-        if code == PLAYLIST_SUCCEEDED_CODE:
-            msg = Message(ExtCodes.PLAYLIST_FETCHED, data)
-            self.msger.send(self.owner, msg)
-        else:
-            print('ffffffffffffffffffail', msg)
+        msg = Message.from_json(ExtCodes, json_msg)
+        self.msger.send(self.owner, msg)
 
 
 def run_server(conn):
@@ -132,4 +123,4 @@ def run_server(conn):
 
 
 if __name__ == '__main__':
-    run_server()
+    run_server(None)

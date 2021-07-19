@@ -14,7 +14,9 @@ class App(QApplication):
         self.ipc_manager = IPCManager()
         self.db.connect()
         self.playlist_manager = PlaylistManager(self.db, self.ipc_manager)
+
         self.main_window = MainWindowController(self.playlist_manager, self.db)
+        self.playlist_manager.add_pl_modified_observer(self.main_window)
 
     def run(self):
         self.main_window.show()

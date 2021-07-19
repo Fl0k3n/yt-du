@@ -68,10 +68,11 @@ class DataLink(Base):
     playlist_link_id = Column(Integer, ForeignKey(
         'playlist_links.link_id'), nullable=False)
     mime = Column(String(50), nullable=False)
+    expire = Column(Integer, nullable=False)
     size = Column(Integer, nullable=False)
-    path = Column(Text, nullable=False)
+    path = Column(Text, nullable=True)
     downloaded = Column(Integer, nullable=False, default=0)
-    download_start_time = Column(TIMESTAMP)
+    download_start_time = Column(TIMESTAMP, nullable=True)
 
     link = relationship('PlaylistLink', back_populates='data_links')
     error_logs = relationship('DownloadErrorLog', back_populates='data_link')

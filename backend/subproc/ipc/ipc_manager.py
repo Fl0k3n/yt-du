@@ -1,42 +1,65 @@
+from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
+from subproc.ipc.ipc_codes import ExtCodes
 import multiprocessing as mp
 from multiprocessing.connection import Connection, wait
 from typing import List
 from backend.model.db_models import Playlist
-from subproc.ext_server import run_server
 from subproc.ipc.message import Message, Messenger
-from subproc.ipc.ipc_codes import ExtCodes
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
+from subproc.ipc.ext_manager import ExtManager
 
 
 class IPCListener(QObject):
     msg_rcvd = pyqtSignal(Message)
     finished = pyqtSignal()
 
-    def __init__(self, connections: List[Connection], msger: Messenger):
+    def __init__(self, msger: Messenger, connections: List[Connection] = None):
         super().__init__()
-        self.connections = connections
+        self.connections = connections if connections is not None else []
         self.msger = msger
         self.keep_listening = True
 
+        self.wake_up_r, self.wake_up_w = mp.Pipe(duplex=False)
+        self.conn_mutex = QMutex()
+        self.conn_not_empty = QWaitCondition()
+
     def add_connection(self, connection: Connection):
+        self.conn_mutex.lock()
         self.connections.append(connection)
 
-    def remove_connection(self, connection: Connection):
-        self.connections.remove(connection)
+        self.conn_not_empty.wakeAll()  # wake from cond wait
+        self.wake_up_w.send('')  # wake from poll wait
+
+        self.conn_mutex.unlock()
 
     def stop(self):
+        # TODO wake here?
         self.keep_listening = False
 
     def run(self):
-        while self.keep_listening and self.connections:
+        while self.keep_listening:
+            self.conn_mutex.lock()
+            while not self.connections:
+                self.conn_not_empty.wait(self.conn_mutex)
+
             print('looping')
-            for rdy_con in wait(self.connections):
+            tmp = [self.wake_up_r, *self.connections]
+            self.conn_mutex.unlock()
+            rdy = wait(tmp)
+            self.conn_mutex.lock()
+
+            for rdy_con in rdy:
+                if rdy_con == self.wake_up_r:
+                    self.wake_up_r.recv()  # ignore it
+                    continue
                 try:
                     msg = self.msger.recv(rdy_con)
                     self.msg_rcvd.emit(msg)
                 except EOFError:
-                    self.remove_connection(rdy_con)
+                    self.connections.remove(rdy_con)
                     # TODO
+
+            self.conn_mutex.unlock()
 
         self.finished.emit()
         # TODO
@@ -49,14 +72,16 @@ class IPCManager:
         # server is listennig for queries
         self.msger = Messenger()
         self.children = []
-
-        self._spawn_extension_worker()
         self._create_listener_thread()
+
+        self.ext_manager = ExtManager(self.msger)
+        self.listener.add_connection(self.ext_manager.get_connection())
+        self.children.append(self.ext_manager.get_subproc())  # TODO ugly
 
     def _create_listener_thread(self):
         self.listener_thread = QThread()
 
-        self.listener = IPCListener([self.ext_conn], self.msger)
+        self.listener = IPCListener(self.msger)
         self.listener.moveToThread(self.listener_thread)
         self.listener.msg_rcvd.connect(self._on_msg_rcvd)
         self.listener.finished.connect(
@@ -65,23 +90,20 @@ class IPCManager:
         self.listener_thread.started.connect(self.listener.run)
         self.listener_thread.start()
 
-    def _on_msg_rcvd(self, msg: Message):
-        print('MANAGER GOT')
-        print(msg)
+    def add_playlist_fetched_observer(self, obs: PlaylistFetchedObserver):
+        self.ext_manager.add_playlist_fetched_observer(obs)
 
-    def _spawn_extension_worker(self):
-        self.ext_conn, child_conn = mp.Pipe(duplex=True)
-        self.ext_proc = mp.Process(target=run_server, args=(child_conn,))
-        self.ext_proc.start()
-        self.children.append(self.ext_proc)
-        child_conn.close()
+    def _on_msg_rcvd(self, msg: Message):
+        print(f'MANAGER GOT [{msg.code}]')
+        if msg.code in set(ExtCodes):
+            self.ext_manager.msg_rcvd(msg)
+        else:
+            print('Unexpected code')
 
     def query_playlist_links(self, playlist: Playlist):
         # send url to ws server
         # go to listennig for data links state
-        msg = Message(ExtCodes.FETCH_PLAYLIST, playlist.url)
-        self.msger.send(self.ext_conn, msg)
-        print('sent')
+        self.ext_manager.query_playlist_links(playlist)
 
     def on_links_rcvd(self):
         # contact playlist mgr
