@@ -1,3 +1,5 @@
+from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
+from backend.model.dl_task import DlTask
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from subproc.ipc.ipc_codes import ExtCodes
 import multiprocessing as mp
@@ -6,7 +8,8 @@ from typing import List
 from backend.model.db_models import Playlist
 from subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
-from subproc.ipc.ext_manager import ExtManager
+from backend.subproc.ipc.ext_manager import ExtManager
+from backend.subproc.ipc.dl_manager import DlManager
 
 
 class IPCListener(QObject):
@@ -66,17 +69,21 @@ class IPCListener(QObject):
         raise RuntimeError('LISTENER FINISHED!!!')
 
 
-class IPCManager:
+class IPCManager(SubprocLifetimeObserver):
     def __init__(self):
         # spawn ws server
         # server is listennig for queries
         self.msger = Messenger()
-        self.children = []
+        self.children: List[mp.Process] = []
         self._create_listener_thread()
 
         self.ext_manager = ExtManager(self.msger)
-        self.listener.add_connection(self.ext_manager.get_connection())
-        self.children.append(self.ext_manager.get_subproc())  # TODO ugly
+        self.dl_manager = DlManager(self.msger)
+
+        for mgr in (self.ext_manager, self.dl_manager):
+            mgr.add_subproc_lifetime_observer(self)
+
+        self.ext_manager.start()
 
     def _create_listener_thread(self):
         self.listener_thread = QThread()
@@ -101,9 +108,10 @@ class IPCManager:
             print('Unexpected code')
 
     def query_playlist_links(self, playlist: Playlist):
-        # send url to ws server
-        # go to listennig for data links state
         self.ext_manager.query_playlist_links(playlist)
+
+    def schedule_dl_task(self, task: DlTask):
+        self.dl_manager.schedule_task(task)
 
     def on_links_rcvd(self):
         # contact playlist mgr
@@ -131,3 +139,7 @@ class IPCManager:
             if child.is_alive():
                 child.terminate()
             child.join()
+
+    def on_subproc_created(self, process: mp.Process, con: Connection):
+        self.listener.add_connection(con)
+        self.children.append(process)

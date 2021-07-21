@@ -1,3 +1,5 @@
+from backend.model.playlist_link_task import PlaylistLinkTask
+from backend.controller.playlist_dl_manager import PlaylistDlManager
 from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
 from typing import Iterable, List
@@ -6,13 +8,13 @@ from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 import urllib.parse as parse
-from model.dl_task import DlTask
 
 
-class PlaylistManager(PlaylistFetchedObserver):
+class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
     def __init__(self, db: DBHandler, ipc_mgr: IPCManager):
         self.db = db
         self.ipc_mgr = ipc_mgr
+
         self.ipc_mgr.add_playlist_fetched_observer(self)
         self.loaded_playlists = []  # list of loaded playlists
         self.pl_url_map = {}  # playlist_url -> idx in list above
@@ -78,10 +80,12 @@ class PlaylistManager(PlaylistFetchedObserver):
                             data_links: Iterable[Iterable[str]]):
 
         playlist = self.get_playlist(id=playlist_id)
+        pl_links = []
 
         for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
             pl_link = PlaylistLink(
                 playlist_number=idx, url=link, title=title)
+            pl_links.append(pl_link)
             pl_link.playlist = playlist
             playlist.links.append(pl_link)
             self.db.add_pl_link(pl_link)
@@ -89,6 +93,7 @@ class PlaylistManager(PlaylistFetchedObserver):
             for dlink in dlinks:
                 dl = self._create_data_link(dlink)
                 dl.link = pl_link
+                pl_link.data_links.append(dl)
                 self.db.add_data_link(dl)
 
         self.db.commit()
@@ -96,9 +101,12 @@ class PlaylistManager(PlaylistFetchedObserver):
         for obs in self.pl_modified_observers:
             obs.playlist_links_added(playlist)
 
-        for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
-            path = self._get_video_path(playlist.directory_path, title, idx)
-            # self.ipc_mgr.schedule_dl_task(DlTask(path, link, dlinks)) ???
+        for pl_link in pl_links:
+            path = self._create_video_path(
+                playlist.directory_path, pl_link.title, pl_link.playlist_number)
+            task = PlaylistLinkTask(
+                pl_link, self, path, pl_link.url, pl_link.data_links)
+            self.ipc_mgr.schedule_dl_task(task)
 
     def _create_data_link(self, url) -> DataLink:
         query = parse.urlparse(url).query
@@ -108,15 +116,14 @@ class PlaylistManager(PlaylistFetchedObserver):
             size = params['clen'][0]
             mime = params['mime'][0]
             expire = params['expire'][0]
+
+            dl = DataLink(size=size, mime=mime, expire=expire)
+            return dl
         except KeyError:
             print('Failed to extract ', url)
 
-        dl = DataLink(size=size, mime=mime, expire=expire)
-
-        return dl
-
-    def _get_video_path(self, directory_path: str, title: str,
-                        playlist_idx: int = None) -> str:
+    def _create_video_path(self, directory_path: str, title: str,
+                           playlist_idx: int = None) -> str:
         dir = Path(directory_path)
 
         filename = f'{title}.mp4'
@@ -124,3 +131,6 @@ class PlaylistManager(PlaylistFetchedObserver):
             filename = f'{playlist_idx}_{filename}'
 
         return str(dir.joinpath(filename).absolute())
+
+    def on_dl_started(self, playlist_link: PlaylistLink):
+        print('DL STARTED for ', playlist_link.title)

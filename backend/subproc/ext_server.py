@@ -8,6 +8,8 @@ from collections import deque
 from subproc.ipc.ipc_codes import ExtCodes
 from subproc.ipc.message import Message, Messenger
 from multiprocessing.connection import Connection
+import subprocess
+import threading
 
 PLAYLIST_FAILED_CODE = 1
 PLAYLIST_SUCCEEDED_CODE = 2
@@ -67,52 +69,77 @@ def on_msg_rcvd(data):
 
 class ExtServer:
     def __init__(self, owner: Connection):
-        self.CONNECTION_TIMEOUT = 5  # seconds
         self.owner = owner
+
+        self.is_connected = False
 
         self.PORT, self.ADDRESS, self.BROWSER_PATH = [
             AL.get_env(val) for val in ['WS_PORT', 'WS_HOST', 'BROWSER']]
 
         self.server = websockets.serve(
-            self._on_connected, self.ADDRESS, self.PORT)
+            self._on_connected, self.ADDRESS, self.PORT, )
 
         self.tasks = deque()
         self.msger = Messenger()
 
+        self.tasks_mutex = threading.Lock()
+        self.connection_mutex = threading.Lock()
+
+        self.task_added = threading.Condition(self.tasks_mutex)
+
     def run(self):
         print(f'WS server running at {self.ADDRESS}:{self.PORT}')
+        self.listener = threading.Thread(
+            target=self._listen_for_tasks, daemon=True)
+        self.listener.start()
         asyncio.get_event_loop().run_until_complete(self.server)
         asyncio.get_event_loop().run_forever()
 
-    async def _get_task(self):
-        # flush task buffer (blocking mode)
-        while self.msger.poll(self.owner):
-            self.tasks.append(self.msger.recv(self.owner))
+    def _listen_for_tasks(self):
+        while True:
+            msg = self.msger.recv(self.owner)
+            # TODO handle different codes
+            with self.tasks_mutex:
+                self.tasks.append(msg)
+                self.task_added.notify_all()
 
-        if self.tasks:
+            with self.connection_mutex:
+                if not self.is_connected:
+                    # task rcvd but no connection, spawn browser
+                    # subprocess.run([self.BROWSER_PATH])
+                    print('TASK RCVD BUT NO CONNECTION')
+
+    def _wait_for_task(self):
+        with self.tasks_mutex:
+            while not self.tasks:
+                self.task_added.wait()
+
             return self.tasks[0]
 
+    async def _get_task(self):
         # if nothing was queued wait for it non blocking
         loop = asyncio.get_running_loop()
         task = await loop.run_in_executor(None,
-                                          lambda: self.msger.recv(self.owner))
-        self.tasks.append(task)
+                                          self._wait_for_task)
         return task
 
     async def _on_connected(self, ws, path):
         print('-----------------------WS Connected-----------------')
+        with self.connection_mutex:
+            self.is_connected = True
         while True:
             task = await self._get_task()
             if task.code == ExtCodes.FETCH_PLAYLIST:
                 await ws.send(task.to_json())
                 resp = await ws.recv()
-                self._on_ext_msg_rcvd(resp)
+                self._on_ext_msg_rcvd(resp, ws)
             else:
                 print('prrrrrrrrr', task)
 
-            self.tasks.popleft()
+            with self.tasks_mutex:
+                self.tasks.popleft()
 
-    def _on_ext_msg_rcvd(self, json_msg):
+    def _on_ext_msg_rcvd(self, json_msg, ws):
         msg = Message.from_json(ExtCodes, json_msg)
         self.msger.send(self.owner, msg)
 

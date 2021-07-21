@@ -8,3 +8,4 @@ class ExtCodes(Enum):
 
     PLAYLIST_FAILED = 3
     PLAYLIST_FETCHED = 4
+    PING = 5  # deprecated

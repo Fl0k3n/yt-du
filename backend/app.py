@@ -12,8 +12,10 @@ class App(QApplication):
         super().__init__(argv)
         self.db = DBHandler(verbose=sql_debug)
         self.ipc_manager = IPCManager()
+
         self.db.connect()
-        self.playlist_manager = PlaylistManager(self.db, self.ipc_manager)
+        self.playlist_manager = PlaylistManager(
+            self.db, self.ipc_manager)
 
         self.main_window = MainWindowController(self.playlist_manager, self.db)
         self.playlist_manager.add_pl_modified_observer(self.main_window)

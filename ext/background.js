@@ -12,19 +12,24 @@ let counter = 0;
 const CODES = {
     FETCH_PLAYLIST: 1,
     PLAYLIST_FAILED: 3,
-    PLAYLIST_FETCHED: 4
+    PLAYLIST_FETCHED: 4,
+    PING: 5 //depracated
 }
 ///////////////////////////////
 
-
+// TODO retries....
 class ConnectionHandler {
-    constructor(port = 5555, retries = 30, connTimeout = 1) {
+    constructor(port = 5562, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
+        this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;
         this.retries = retries; //after retries retry time is doubled
         this.connEstb = false;
         this.connTimeout = connTimeout;
+        this.pingTime = pingTime;
+        this.pingedBack = true;
 
+        this.pinger = null;
         this.init();
     }
 
@@ -35,6 +40,21 @@ class ConnectionHandler {
         this.socket.addEventListener('error', err => this.onError(err));
         this.socket.addEventListener('open', ev => this.onConnected(ev));
         this.socket.addEventListener('message', msg => this.onMsgRcvd(msg.data));
+
+    }
+
+    _reset() {
+        if (this.socket !== null) {
+            this.socket.close();
+            this.socket = null;
+        }
+        if (this.pinger !== null) {
+            clearInterval(this.pinger);
+            this.pinger = null;
+            this.pingedBack = true;
+        }
+        this.connEstb = false;
+        this.connTimeout = this.START_CON_TIMEOUT;
     }
 
     onMsgRcvd(msg) {
@@ -44,6 +64,8 @@ class ConnectionHandler {
         const data = msg_ob['data'];
         if (code == CODES.FETCH_PLAYLIST)
             this.extractor.addPlaylist(data['url'], msg_ob);
+        else if (code == CODES.PING)
+            this.pingedBack = true;
         else
             console.log('Rcvd unsupported msg type', msg);
     }
@@ -58,16 +80,48 @@ class ConnectionHandler {
 
             setTimeout(() => this.init(), this.connTimeout * 1000);
         }
-        else
+        else {
             console.log(`Error after connection, aborting`);
-
-        this.socket.close();
-        this.socket = null;
+            setTimeout(() => this.init(), this.START_CON_TIMEOUT * 1000);
+        }
+        this._reset();
     }
 
     onConnected(ev) {
-        this.connEstb = true;
-        console.log('connected', ev);
+        if (this.connEstb)
+            console.error('ALREADY CONNECTED');
+        else {
+            this.connEstb = true;
+            console.log('connected', ev);
+            this.pinger = setInterval(() => this._ping(), this.pingTime * 1000);
+        }
+    }
+
+    _ping() {
+        if (this.socket.readyState === WebSocket.CLOSED ||
+            this.socket.readyState === WebSocket.CLOSING) {
+            console.log('LOST CONNECTION, retrying');
+            this._reset();
+            this.init();
+        }
+
+        // if (!this.pingedBack) {
+        //     console.log('LOST CONNECTION, retrying...');
+        //     this._reset();
+        //     this.init();
+        // }
+        // else {
+        //     try {
+        //         this.pingedBack = false;
+        //         this.socket.send(JSON.stringify({
+        //             code: CODES.PING,
+        //             data: ''
+        //         }));
+        //         console.log('sent!');
+        //     } catch (err) {
+        //         // ignore will be taken care of in next ping iteration
+        //     }
+        // }
     }
 
     _sendData(playlist, code, data, echo) {

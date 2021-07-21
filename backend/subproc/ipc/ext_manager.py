@@ -1,3 +1,4 @@
+from typing import List
 import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from subproc.ipc.ipc_codes import ExtCodes
@@ -6,30 +7,34 @@ from backend.model.db_models import Playlist
 import multiprocessing as mp
 from multiprocessing.connection import Connection
 from subproc.ext_server import run_server
+from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 
 
 class ExtManager:
     def __init__(self, msger: Messenger):
         self.msger = msger
-        self.ext_conn, child_conn = mp.Pipe(duplex=True)
-        self.ext_proc = mp.Process(target=run_server, args=(child_conn,))
-        self.ext_proc.start()
-        child_conn.close()
 
-        self.pl_fetched_obss = []
+        self.pl_fetched_obss: List[PlaylistFetchedObserver] = []
+        self.subproc_obss: List[SubprocLifetimeObserver] = []
 
         self.msg_handlers = {
             ExtCodes.PLAYLIST_FETCHED: self._on_playlist_fetched
         }
 
+    def start(self):
+        self.ext_conn, child_conn = mp.Pipe(duplex=True)
+        self.ext_proc = mp.Process(target=run_server, args=(child_conn,))
+        self.ext_proc.start()
+        child_conn.close()
+
+        for obs in self.subproc_obss:
+            obs.on_subproc_created(self.ext_proc, self.ext_conn)
+
     def add_playlist_fetched_observer(self, obs: PlaylistFetchedObserver):
         self.pl_fetched_obss.append(obs)
 
-    def get_connection(self) -> Connection:
-        return self.ext_conn
-
-    def get_subproc(self) -> mp.Process:
-        return self.ext_proc
+    def add_subproc_lifetime_observer(self, obs: SubprocLifetimeObserver):
+        self.subproc_obss.append(obs)
 
     def query_playlist_links(self, playlist: Playlist):
         ext_data = {
