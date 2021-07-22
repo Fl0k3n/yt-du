@@ -226,12 +226,6 @@ class YTDownloader:
         try:
             with open(out_file_path, 'wb') as f:
                 for i, (chunk_link, chunk_size) in enumerate(self._gen_chunk_links(link)):
-                    if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
-                        self.status_obs.dl_finished(idx)
-                        # self.status_obs.process_finished(False)
-                        # TODO
-                        break
-
                     retried = 0
                     while True:
                         try:
@@ -244,6 +238,12 @@ class YTDownloader:
 
                                 for chunk in r.raw:
                                     tmp_f.write(chunk)
+
+                            if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
+                                self.status_obs.dl_finished(idx)
+                                # self.status_obs.process_finished(False)
+                                # TODO
+                                break
 
                             # ok chunk read without errors rewrite it to output file
                             with open(tmp_file_path, 'rb') as tmp_f:

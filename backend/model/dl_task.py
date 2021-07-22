@@ -22,9 +22,13 @@ class DlTask(ABC):
     def dl_started(self, link_idx: int):
         pass
 
-    # @abstractmethod
-    # def on_dl_progressed(self):
-    #     pass
+    @abstractmethod
+    def dl_permission_requested(self, link_idx: int) -> bool:
+        pass
+
+    @abstractmethod
+    def chunk_fetched(self, link_idx: int, bytes_fetched: int):
+        pass
 
     def __str__(self):
         return f'[DL TASK] {self.url} | {self.dest_path}'

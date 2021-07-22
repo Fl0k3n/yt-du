@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class ExtCodes(Enum):
+    """Codes used for IPC with extension server"""
     # ! keep it consistent with background.js codes
 
     FETCH_PLAYLIST = 1
@@ -12,4 +13,13 @@ class ExtCodes(Enum):
 
 
 class DlCodes(Enum):
-    DL_STARTED = 1  # data: int = index of data link
+    """Codes used for IPC with yt_dl worker"""
+
+    # data: int = index of data link
+    DL_STARTED = 1
+    # data: int = index of data link
+    CAN_PROCEED_DL = 2
+    # data: bool = whether dl can be proceeded
+    DL_PERMISSION = 3
+    # data: tuple(int, int) = (index of data link, bytes dl'ed)
+    CHUNK_FETCHED = 4

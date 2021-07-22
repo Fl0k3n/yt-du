@@ -1,6 +1,5 @@
 from typing import Iterable
 from backend.model.db_models import Playlist, PlaylistLink
-from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.view.data_summary_box import DataSummaryBox
 from backend.controller.gui.new_playlist_ctl import NewPlaylistController
 import PyQt5
@@ -12,15 +11,14 @@ from backend.controller.gui.data_summary_ctl import DataSummaryController
 from controller.gui.view_changer import DataViewChanger
 
 
-class MainWindowController(DataViewChanger, PlaylistModifiedObserver):
+class MainWindowController(DataViewChanger):
     def __init__(self, playlist_manager: PlaylistManager, db: DBHandler):
         self.playlist_mgr = playlist_manager
         self.db = db
         self.new_playlist_ctl = None
 
-        self.playlist_m_observers = [self.playlist_mgr]
-
         self.data_summary_ctl = DataSummaryController(self, self.playlist_mgr)
+        self.playlist_mgr.add_pl_modified_observer(self.data_summary_ctl)
         self.data_view = self.data_summary_ctl.get_data_list_view()
 
         self.view = MainWindow(self.data_view, self, CallRcvrCommand(
@@ -28,12 +26,6 @@ class MainWindowController(DataViewChanger, PlaylistModifiedObserver):
 
         self.view_stack = [self.data_view]
         self.data_view_changed_observers = [self.data_summary_ctl]
-
-    def playlist_added(self, playlist: Playlist):
-        self.data_summary_ctl.playlist_added(playlist)
-
-    def playlist_links_added(self, playlist: Playlist):
-        self.data_summary_ctl.playlist_links_added(playlist)
 
     def show(self):
         self.view.show()

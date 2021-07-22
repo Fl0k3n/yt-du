@@ -44,18 +44,3 @@ class Messenger:
 
     def poll(self, conn: Connection) -> bool:
         return conn.poll()
-
-
-'''
-wait for fetch - just after add
-fetch urls - when fetch url task was scheduled
-wait for download - when download task was scheduled
-downloading
-merging
-done
-
-??
-errors
-stopped
-
-'''

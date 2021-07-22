@@ -32,9 +32,12 @@ class DlManager:
 
         self.task_queue: Deque[StoredDlTask] = deque()
         self.tasks: Dict[int, StoredDlTask] = {}
+        self.connections: Dict[int, Connection] = {}
 
         self.handlers = {
-            DlCodes.DL_STARTED: self._on_dl_started
+            DlCodes.DL_STARTED: self._on_dl_started,
+            DlCodes.CAN_PROCEED_DL: self._on_can_proceed_dl,
+            DlCodes.CHUNK_FETCHED: self._on_chunk_fetched
         }
 
         self.id_gen = self._create_task_id_gen()
@@ -58,6 +61,7 @@ class DlManager:
         dlink1, dlink2 = task.get_media_urls()
 
         my_con, child_con = mp.Pipe(duplex=True)
+        self.connections[s_task.task_id] = my_con
 
         proc = mp.Process(target=self._run_downloader, args=(
             path, url, dlink1, dlink2, child_con, s_task.task_id))
@@ -68,8 +72,20 @@ class DlManager:
         for obs in self.subproc_obss:
             obs.on_subproc_created(proc, my_con)
 
-    def _on_download_finished(self):
-        pass
+    def _on_chunk_fetched(self, dl_data: DlData):
+        link_id, bytes_fetched = dl_data.data
+        task = self._get_task(dl_data)
+        task.chunk_fetched(link_id, bytes_fetched)
+
+    def _on_can_proceed_dl(self, dl_data: DlData):
+        link_id = dl_data.data
+        task = self._get_task(dl_data)
+        permission = task.dl_permission_requested(link_id)
+
+        conn = self.connections[dl_data.task_id]
+        resp_msg = Message(DlCodes.DL_PERMISSION, permission)
+
+        self.msger.send(conn, resp_msg)
 
     def _on_dl_started(self, dl_data: DlData):
         link_id = dl_data.data

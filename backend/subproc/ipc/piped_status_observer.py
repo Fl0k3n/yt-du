@@ -19,11 +19,21 @@ class PipedStatusObserver(StatusObserver):
         print('[PIPED] dl finished')
 
     def chunk_fetched(self, idx: int, bytes_len: int):
-        print('[PIPED] chunk fetched')
+        msg = self._create_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len))
+        self.msger.send(self.conn, msg)
 
     def can_proceed_dl(self, idx: int) -> bool:
-        print('[PIPED] can proceed')
-        return True
+        msg = self._create_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
+        self.msger.send(self.conn, msg)
+        # TODO timeout?
+        response = self.msger.recv(self.conn)
+
+        if response.code != DlCodes.DL_PERMISSION:
+            # TODO send another msg ?
+            print('in can proceed recvd unexpected msg', response)
+            exit(1)
+
+        return response.data
 
     def merge_started(self):
         print('[PIPED] merge started')

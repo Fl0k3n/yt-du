@@ -25,9 +25,22 @@ class NewPlaylistWindow(QDialog):
         self.url_input, self.name_input, self.path_input = self.inputs
 
         # TODO
+        # SHORT
+        # self.url_input.setText(
+        #     'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX')
+        # self.name_input.setText('GOTHIC TEST')
+        # self.path_input.setText('/home/flok3n/music')
+
+        # MEDIUM
+        # self.url_input.setText(
+        #     'https://www.youtube.com/watch?v=wMSUZhsmttA&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj')
+        # self.name_input.setText('LIVE LOVE ASAP TEST')
+        # self.path_input.setText('/home/flok3n/music')
+
+        # # LONG
         self.url_input.setText(
-            'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX')
-        self.name_input.setText('GOTHIC TEST')
+            'https://www.youtube.com/watch?v=3f-eCQ00tP8&list=PL-3XmUCH8wflJNQSFzqooCEloXXZqBPOE')
+        self.name_input.setText('GIMPER TEST')
         self.path_input.setText('/home/flok3n/music')
 
         btn_box = QWidget()

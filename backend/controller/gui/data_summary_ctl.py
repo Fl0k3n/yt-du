@@ -67,7 +67,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         dl_item = playlist.to_data_list_item(
             self._get_playlist_details_cmd(playlist))
 
-        dl_item.set_status('fetch urls')
+        self._update_status(playlist)
 
         self.visible_playlists = [dl_item, *self.visible_playlists]
         self.playlist_view.append_top(dl_item)
@@ -75,12 +75,18 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def playlist_links_added(self, playlist: Playlist):
         if self.displayed_playlist == playlist:
             self.view_changer.change_back()
-            self._update_status(playlist, 'waiting for dl')
+            self._update_status(playlist)
             self._show_playlist_details(playlist)
 
-    def _update_status(self, item: Displayable, status: str):
+    def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:
-            self.displayable_to_view[item].set_status(status)
+            self.displayable_to_view[item].set_status(str(item.get_status()))
+
+    def _update_dl_progress(self, item: Displayable,
+                            total_size: int, current_dl: int):
+        if item in self.displayable_to_view:
+            self.displayable_to_view[item].update_progress_bar(
+                current_dl / total_size)
 
     def get_data_list_view(self) -> DataSummaryBox:
         return self.view
@@ -92,6 +98,11 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             view_item = item.to_data_list_item(command)
             res.append(view_item)
             self.displayable_to_view[item] = view_item
+            try:
+                view_item.update_progress_bar(
+                    item.get_downloaded_bytes() / item.get_size_bytes())
+            except ZeroDivisionError:
+                view_item.update_progress_bar(0)
         return res
 
     def _get_playlist_details_cmd(self, playlist: Playlist) -> Command:
@@ -106,3 +117,17 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def on_changed_forward(self):
         # TODO
         pass
+
+    def _update_pl_progress(self, playlist: Playlist):
+        pl_size = self.playlist_mgr.get_playlist_size_bytes(playlist)
+        pl_dled = self.playlist_mgr.get_playlist_downloaded_bytes(playlist)
+        self._update_dl_progress(playlist, pl_size, pl_dled)
+
+    def _update_link_progress(self, playlist_link: PlaylistLink):
+        link_size = self.playlist_mgr.get_link_size_bytes(playlist_link)
+        link_dled = self.playlist_mgr.get_link_downloaded_bytes(playlist_link)
+        self._update_dl_progress(playlist_link, link_size, link_dled)
+
+    def playlist_dl_progressed(self, playlist: Playlist, playlist_link: PlaylistLink):
+        self._update_pl_progress(playlist)
+        self._update_link_progress(playlist_link)

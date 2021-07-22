@@ -7,6 +7,7 @@ from backend.controller.db_handler import DBHandler
 from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
+from backend.model.data_status import DataStatus
 import urllib.parse as parse
 import datetime
 
@@ -21,12 +22,19 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         self.pl_url_map = {}  # playlist_url -> idx in list above
         self.pl_idx_map = {}  # playlist_id  -> idx in list above
 
-        self.pl_modified_observers = []
+        self.pl_sizes = {}  # playlist_id -> size in bytes
+        self.dled_pl_bytes = {}  # playlist_id -> dled size in bytes
+
+        self.pl_link_sizes = {}  # link_id -> size in bytes
+        self.dled_link_bytes = {}  # link_id -> dled size in bytes
+
+        self.pl_modified_observers: List[PlaylistFetchedObserver] = []
 
     def add_pl_modified_observer(self, obs: PlaylistModifiedObserver):
         self.pl_modified_observers.append(obs)
 
     def add_playlist(self, playlist: Playlist):
+        playlist.set_status(DataStatus.WAIT_FOR_FETCH)
         self.db.add_playlist(playlist)
         self.db.commit()
         self._cache_playlist(playlist)
@@ -36,7 +44,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             obs.playlist_added(playlist)
 
     def _cache_playlist(self, playlist: Playlist):
-        if playlist is None:
+        if playlist is None:  # ???
             return
         idx = len(self.loaded_playlists)
         self.loaded_playlists.append(playlist)
@@ -81,23 +89,38 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
                             data_links: Iterable[Iterable[str]]):
 
         playlist = self.get_playlist(id=playlist_id)
+        playlist.set_status(DataStatus.WAIT_FOR_DL)
+        link_sizes = []
         pl_links = []
 
         for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
             pl_link = PlaylistLink(
                 playlist_number=idx, url=link, title=title)
+
+            pl_link.set_status(DataStatus.WAIT_FOR_DL)
             pl_links.append(pl_link)
             pl_link.playlist = playlist
             playlist.links.append(pl_link)
             self.db.add_pl_link(pl_link)
 
+            size = 0
             for dlink in dlinks:
                 dl = self._create_data_link(dlink)
                 dl.link = pl_link
                 pl_link.data_links.append(dl)
                 self.db.add_data_link(dl)
+                size += dl.size
+
+            link_sizes.append(size)
 
         self.db.commit()
+
+        for link, size in zip(pl_links, link_sizes):
+            self.pl_link_sizes[link.link_id] = size
+            self.dled_link_bytes[link.link_id] = 0
+
+        self.pl_sizes[playlist.playlist_id] = sum(link_sizes)
+        self.dled_pl_bytes[playlist.playlist_id] = 0
 
         for obs in self.pl_modified_observers:
             obs.playlist_links_added(playlist)
@@ -114,9 +137,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         params = parse.parse_qs(query)
 
         try:
-            size = params['clen'][0]
+            size = int(params['clen'][0])
             mime = params['mime'][0]
-            expire = params['expire'][0]
+            expire = int(params['expire'][0])
 
             dl = DataLink(url=url, size=size, mime=mime, expire=expire)
             return dl
@@ -134,5 +157,72 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         return str(dir.joinpath(filename).absolute())
 
     def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink):
+        playlist_link.set_status(DataStatus.DOWNLOADING)
         print('DL STARTED for ', playlist_link.title)
         data_link.download_start_time = datetime.datetime.now()
+
+    def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
+        # TODO check if not paused or smth idk
+        return True
+
+    def on_dl_progress(self, playlist_link: PlaylistLink,
+                       data_link: DataLink, bytes_fetched: int):
+        if playlist_link.link_id not in self.dled_link_bytes:
+            self._cache_dled_link_bytes(playlist_link)
+
+        if playlist_link.playlist_id not in self.dled_pl_bytes:
+            self._cache_dled_playlist_bytes(playlist_link.playlist)
+
+        self.dled_pl_bytes[playlist_link.playlist_id] += bytes_fetched
+        self.dled_link_bytes[playlist_link.link_id] += bytes_fetched
+        data_link.downloaded += bytes_fetched
+
+        self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_dl_progressed(playlist_link.playlist, playlist_link)
+
+    def _cache_link_size(self, playlist_link: PlaylistLink):
+        size = playlist_link.get_size_bytes()
+        self.pl_link_sizes[playlist_link.link_id] = size
+
+    def _cache_playlist_size(self, playlist: Playlist):
+        size = 0
+        for link in playlist.links:
+            if link.link_id not in self.pl_link_sizes:
+                self._cache_link_size(link)
+            size += self.pl_link_sizes[link.link_id]
+        self.pl_sizes[playlist.playlist_id] = size
+
+    def _cache_dled_link_bytes(self, playlist_link: PlaylistLink):
+        size = playlist_link.get_downloaded_bytes()
+        self.dled_link_bytes[playlist_link.link_id] = size
+
+    def _cache_dled_playlist_bytes(self, playlist: Playlist):
+        size = 0
+        for link in playlist.links:
+            if link.link_id not in self.dled_link_bytes:
+                self._cache_dled_link_bytes(link)
+            size += self.dled_link_bytes[link.link_id]
+        self.dled_pl_bytes[playlist.playlist_id] = size
+
+    def get_playlist_size_bytes(self, playlist: Playlist) -> int:
+        if playlist.playlist_id not in self.pl_sizes:
+            self._cache_playlist_size(playlist)
+
+        return self.pl_sizes[playlist.playlist_id]
+
+    def get_playlist_downloaded_bytes(self, playlist: Playlist) -> int:
+        if playlist.playlist_id not in self.dled_pl_bytes:
+            self._cache_dled_playlist_bytes(playlist)
+        return self.dled_pl_bytes[playlist.playlist_id]
+
+    def get_link_size_bytes(self, playlist_link: PlaylistLink) -> int:
+        if playlist_link.link_id not in self.pl_link_sizes:
+            self._cache_link_size(playlist_link)
+        return self.pl_link_sizes[playlist_link.link_id]
+
+    def get_link_downloaded_bytes(self, playlist_link: PlaylistLink) -> int:
+        if playlist_link.link_id not in self.dled_link_bytes:
+            self._cache_dled_link_bytes(playlist_link)
+        return self.dled_link_bytes[playlist_link.link_id]
