@@ -5,13 +5,14 @@ from view.data_list_item import DataListItem
 
 class PlaylistListItem(DataListItem):
     def __init__(self, name: str, url: str, directory_path: str,
-                 show_details_command: Command = None, parent: QWidget = None):
-        super().__init__(url=url, directory_path=directory_path,
+                 status: str = 'new', show_details_command: Command = None, parent: QWidget = None):
+        super().__init__(url=url, status=status, directory_path=directory_path,
                          show_details_command=show_details_command, parent=parent)
         self.name = name
 
         self.layout = QHBoxLayout(self)
         self.layout.addWidget(QLabel(self.name))
+        self.layout.addWidget(QLabel(self.status))
 
         self.progress_bar = QProgressBar()
         self.layout.addWidget(self.progress_bar)

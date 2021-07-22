@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from utils.assets_loader import AssetsLoader as AL
 from collections import deque
-from subproc.ipc.ipc_codes import ExtCodes
-from subproc.ipc.message import Message, Messenger
+from backend.subproc.ipc.ipc_codes import ExtCodes
+from backend.subproc.ipc.message import Message, Messenger
 from multiprocessing.connection import Connection
 import subprocess
 import threading

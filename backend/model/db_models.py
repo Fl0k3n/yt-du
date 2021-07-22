@@ -67,8 +67,9 @@ class DataLink(Base):
     link_id = Column(Integer, primary_key=True, autoincrement=True)
     playlist_link_id = Column(Integer, ForeignKey(
         'playlist_links.link_id'), nullable=False)
+    url = Column(Text, nullable=False)
     mime = Column(String(50), nullable=False)
-    expire = Column(Integer, nullable=False)
+    expire = Column(Integer, nullable=False)  # epoch time
     size = Column(Integer, nullable=False)
     path = Column(Text, nullable=True)
     downloaded = Column(Integer, nullable=False, default=0)

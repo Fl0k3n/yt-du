@@ -34,19 +34,19 @@ class StatusObserver(ABC):
     """All download methods have to be thread safe"""
 
     @abstractmethod
-    def dl_started(self, url: str):
+    def dl_started(self, idx: int):
         pass
 
     @abstractmethod
-    def dl_finished(self, url: str):
+    def dl_finished(self, idx: int):
         pass
 
     @abstractmethod
-    def chunk_fetched(self, url: str, bytes_len: int):
+    def chunk_fetched(self, idx: int, bytes_len: int):
         pass
 
     @abstractmethod
-    def can_proceed_dl(self, url: str) -> bool:
+    def can_proceed_dl(self, idx: int) -> bool:
         pass
 
     @abstractmethod
@@ -58,7 +58,7 @@ class StatusObserver(ABC):
         pass
 
     @abstractmethod
-    def dl_error_occured(self, exc_type: str, exc_msg: str):
+    def dl_error_occured(self, idx:int, exc_type: str, exc_msg: str):
         pass
 
     @abstractmethod
@@ -219,15 +219,15 @@ class YTDownloader:
             print(f"[{self.title}] Fetching: {link[:150]}...")
 
         if self.status_obs is not None:
-            self.status_obs.dl_started(link)
+            self.status_obs.dl_started(idx)
 
         tmp_file_path = f'{out_file_path}_{idx}'
 
         try:
             with open(out_file_path, 'wb') as f:
                 for i, (chunk_link, chunk_size) in enumerate(self._gen_chunk_links(link)):
-                    if self.status_obs is not None and not self.status_obs.can_proceed_dl(link):
-                        self.status_obs.dl_finished(link)
+                    if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
+                        self.status_obs.dl_finished(idx)
                         # self.status_obs.process_finished(False)
                         # TODO
                         break
@@ -250,14 +250,14 @@ class YTDownloader:
                                 f.write(tmp_f.read())
 
                             if self.status_obs is not None:
-                                self.status_obs.chunk_fetched(link, chunk_size)
+                                self.status_obs.chunk_fetched(idx, chunk_size)
 
                             break
                         except Exception as e:
                             print("Failed to fetch.")
                             print(type(e), e)
                             if self.status_obs is not None:
-                                self.status_obs.dl_error_occured(
+                                self.status_obs.dl_error_occured(idx,
                                     type(e), repr(e))
 
                             if retried == self.retries:
@@ -268,7 +268,7 @@ class YTDownloader:
         except UnsupportedURLError as e:
             print(e)
             if self.status_obs is not None:
-                self.status_obs.dl_error_occured(type(e), repr(e))
+                self.status_obs.dl_error_occured(idx, type(e), repr(e))
             self.thread_status[idx] = Codes.FETCH_FAILED
             return
 
@@ -359,7 +359,7 @@ class YTDownloader:
         for i, thread in enumerate(self.threads):
             thread.join()
             if self.status_obs is not None:
-                self.status_obs.dl_finished(self.data_links[i])
+                self.status_obs.dl_finished(i)
 
             if self.thread_status[i] != Codes.SUCCESS:
                 status = self.thread_status[i]

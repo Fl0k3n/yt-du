@@ -1,12 +1,12 @@
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.model.dl_task import DlTask
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
-from subproc.ipc.ipc_codes import ExtCodes
+from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
 import multiprocessing as mp
 from multiprocessing.connection import Connection, wait
 from typing import List
 from backend.model.db_models import Playlist
-from subproc.ipc.message import Message, Messenger
+from backend.subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
 from backend.subproc.ipc.ext_manager import ExtManager
 from backend.subproc.ipc.dl_manager import DlManager
@@ -57,6 +57,7 @@ class IPCListener(QObject):
                     continue
                 try:
                     msg = self.msger.recv(rdy_con)
+                    print(f'LISTENER GOT {type(msg)} -> {msg}')
                     self.msg_rcvd.emit(msg)
                 except EOFError:
                     self.connections.remove(rdy_con)
@@ -80,6 +81,9 @@ class IPCManager(SubprocLifetimeObserver):
         self.ext_manager = ExtManager(self.msger)
         self.dl_manager = DlManager(self.msger)
 
+        self.ext_codes = set(ExtCodes)
+        self.dl_codes = set(DlCodes)
+
         for mgr in (self.ext_manager, self.dl_manager):
             mgr.add_subproc_lifetime_observer(self)
 
@@ -102,8 +106,10 @@ class IPCManager(SubprocLifetimeObserver):
 
     def _on_msg_rcvd(self, msg: Message):
         print(f'MANAGER GOT [{msg.code}]')
-        if msg.code in set(ExtCodes):
+        if msg.code in self.ext_codes:
             self.ext_manager.msg_rcvd(msg)
+        elif msg.code in self.dl_codes:
+            self.dl_manager.msg_rcvd(msg)
         else:
             print('Unexpected code')
 

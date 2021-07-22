@@ -8,6 +8,7 @@ from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 import urllib.parse as parse
+import datetime
 
 
 class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
@@ -117,7 +118,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             mime = params['mime'][0]
             expire = params['expire'][0]
 
-            dl = DataLink(size=size, mime=mime, expire=expire)
+            dl = DataLink(url=url, size=size, mime=mime, expire=expire)
             return dl
         except KeyError:
             print('Failed to extract ', url)
@@ -132,5 +133,6 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
         return str(dir.joinpath(filename).absolute())
 
-    def on_dl_started(self, playlist_link: PlaylistLink):
+    def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink):
         print('DL STARTED for ', playlist_link.title)
+        data_link.download_start_time = datetime.datetime.now()

@@ -1,7 +1,7 @@
 from typing import List
 import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
-from subproc.ipc.ipc_codes import ExtCodes
+from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
 from backend.model.db_models import Playlist
 import multiprocessing as mp

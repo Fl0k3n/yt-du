@@ -11,9 +11,11 @@ from PyQt5.QtWidgets import QApplication, QMenu, QWidget
 class DataListItem(QWidget):
     HEIGHT = 100
 
-    def __init__(self, url: str, directory_path: str, show_details_command: Command, parent: QWidget):
+    def __init__(self, url: str, directory_path: str, status: str,
+                 show_details_command: Command, parent: QWidget):
         super().__init__(parent)
         self.url = url
+        self.status = status
         self.directory_path = directory_path
         self.setMinimumHeight(self.HEIGHT)
         self.setMaximumHeight(self.HEIGHT)
@@ -22,6 +24,9 @@ class DataListItem(QWidget):
     # @abstractmethod
     # def on_click(self):
     #     pass
+
+    def set_status(self, status: str):
+        self.status = status
 
     def mouseDoubleClickEvent(self, a0: QtGui.QMouseEvent) -> None:
         if self.show_details_command:

@@ -19,7 +19,7 @@ const CODES = {
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5562, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = 5555, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;

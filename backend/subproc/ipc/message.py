@@ -25,6 +25,15 @@ class Message:
         return Message(enum_type(data['code']), data['data'])
 
 
+class DlData:
+    def __init__(self, task_id: int, data: Any = None):
+        self.task_id = task_id
+        self.data = data
+
+    def __str__(self) -> str:
+        return f'#{self.task_id}: {self.data}'
+
+
 # wrapper for DI
 class Messenger:
     def send(self, conn: Connection, msg: Message):
@@ -35,3 +44,18 @@ class Messenger:
 
     def poll(self, conn: Connection) -> bool:
         return conn.poll()
+
+
+'''
+wait for fetch - just after add
+fetch urls - when fetch url task was scheduled
+wait for download - when download task was scheduled
+downloading
+merging
+done
+
+??
+errors
+stopped
+
+'''

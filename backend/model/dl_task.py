@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
+from backend.model.db_models import DataLink
 from typing import List
 
 
 class DlTask(ABC):
-    def __init__(self, dest_path: str, url: str, media_urls: List[str]):
+    def __init__(self, dest_path: str, url: str, data_links: List[DataLink]):
         self.dest_path = dest_path
         self.url = url
-        self.media_urls = media_urls
+        self.data_links = data_links
 
     def get_url(self) -> str:
         return self.url
@@ -15,10 +16,10 @@ class DlTask(ABC):
         return self.dest_path
 
     def get_media_urls(self) -> List[str]:
-        return self.media_urls
+        return [link.url for link in self.data_links]
 
     @abstractmethod
-    def dl_started(self):
+    def dl_started(self, link_idx: int):
         pass
 
     # @abstractmethod
