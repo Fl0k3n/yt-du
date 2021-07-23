@@ -49,3 +49,6 @@ class PipedStatusObserver(StatusObserver):
 
     def _create_dl_msg(self, code: DlCodes, data: Any) -> DlData:
         return Message(code, DlData(self.task_id, data))
+
+    def failed_to_init(self, exc_type: str, exc_msg: str):
+        print('[PIPED] init error')

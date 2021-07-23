@@ -1,3 +1,6 @@
+from queue import Queue, Empty
+import time
+import threading
 from pprint import pprint
 import requests
 import pathlib
@@ -6,6 +9,7 @@ import sys
 import asyncio
 import random
 import re
+
 
 # async def produce(name, q):
 #     print('running')
@@ -53,47 +57,32 @@ import re
 # import os
 # import multiprocessing
 
-link = 'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX&index=1'
+# type 1 urls
+# link = 'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX&index=1'
 
-title = 'Śniący!!! Zbudź się!!!'
+# title = 'Śniący!!! Zbudź się!!!'
 
-playlist_name = 'gothic'
+# playlist_name = 'gothic'
 
-path = '/home/flok3n/ytdl/sniacy_zbudz_sie.mp4'
+# path = '/home/flok3n/ytdl/sniacy_zbudz_sie.mp4'
 
-u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1626756501&ei=NQH2YKeOI87vyQXIsYOoBw&ip=185.25.121.191&id=o-AJzDX_zZYc9SyQQ3H0yarN1Nfgj1MoV7fyMApWSTBVbX&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pcm2cms=yes&pl=24&initcwndbps=1578750&vprv=1&mime=video%2Fmp4&ns=F2JXjm2jAK_NJ1cyfXAvEA0G&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1626734678&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=m_oaExrbl0dioA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIgGA7ahAnBOurxx6fIh29dQPmDTB-Gr4-0CMPXxugna-kCIQDvUYhXrjg7EyhlTKLv6Apmeu65k-YNXqaBvmNFS_Mr6A%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgLBGMUEDPL_b4ZP5Cpi-PqsG1lDneFOH3nRjhpSzTtdwCIQCXIubOpGFasPA7G1teD_WC-D2RTUTWP1gbL9pwWXdvhQ%3D%3D&alr=yes&cpn=RpxmakBrkfdouPKA&cver=2.20210719.00.00&range=0-63173&rn=1&rbuf=0'
+# u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627076719&ei=D-T6YPbRBMnQyQXGy4nYCg&ip=185.25.121.191&id=o-AP77BqkOr4qzg8ktEiv5YAHe6LFZLEgkV_QSLAGNtdjf&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1155000&vprv=1&mime=video%2Fmp4&ns=qA075e8toqohCxuH9mRQ6vMG&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1627055088&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=kBDEehZreM1qPg&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAOMFyWyzMfSyy3A9yzGuEXZwasms6_7aPlntJNLXq5nbAiAE7YAda6vBtqkAwsohY1NJOgul0yVifBAoRkwoTtjCWA%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRAIgfeHP-dnKrLwA-CdWwYB0BBqV-SR-d1xVK_Efny5ttqsCIDlFaoPp7-HZllQABCFBcrkrQzK-0qrda3Epk6JEvIhf&alr=yes&cpn=C7jNfo5rbJDeCYyx&cver=2.20210721.00.00&range=0-63173&rn=1&rbuf=0'
 
-u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1626756501&ei=NQH2YKeOI87vyQXIsYOoBw&ip=185.25.121.191&id=o-AJzDX_zZYc9SyQQ3H0yarN1Nfgj1MoV7fyMApWSTBVbX&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pcm2cms=yes&pl=24&initcwndbps=1578750&vprv=1&mime=audio%2Fwebm&ns=F2JXjm2jAK_NJ1cyfXAvEA0G&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1626734678&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=m_oaExrbl0dioA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRAIgBZbm4_muWnLcv2rY7pApiwMCmt501TnnmKEkmTGOuaYCICPPlnlvdmXCiqMBfTckX0HqGWJyNXXsQVgP9s2VUmF2&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgLBGMUEDPL_b4ZP5Cpi-PqsG1lDneFOH3nRjhpSzTtdwCIQCXIubOpGFasPA7G1teD_WC-D2RTUTWP1gbL9pwWXdvhQ%3D%3D&alr=yes&cpn=RpxmakBrkfdouPKA&cver=2.20210719.00.00&range=0-65812&rn=2&rbuf=0'
+# u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627076719&ei=D-T6YPbRBMnQyQXGy4nYCg&ip=185.25.121.191&id=o-AP77BqkOr4qzg8ktEiv5YAHe6LFZLEgkV_QSLAGNtdjf&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1155000&vprv=1&mime=audio%2Fwebm&ns=qA075e8toqohCxuH9mRQ6vMG&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1627055088&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=kBDEehZreM1qPg&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIgcj2OlLM0WXkUFrGnPrB-gHnl65Bu7MBpVXbKCFJdRI4CIQD4KAJ_50bAU-WZ0T8P5PRQ8MXKOBHklEnCGhRVrl3mbQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRAIgfeHP-dnKrLwA-CdWwYB0BBqV-SR-d1xVK_Efny5ttqsCIDlFaoPp7-HZllQABCFBcrkrQzK-0qrda3Epk6JEvIhf&alr=yes&cpn=C7jNfo5rbJDeCYyx&cver=2.20210721.00.00&range=0-65812&rn=2&rbuf=0'
 
 
-def _gen_chunk_links(link):
-    clen_re = r'(?<=(?:\?|&)clen=)(\d+)'
-    matches = re.search(clen_re, u1)
-    if not matches:
-        raise ValueError('Unsupported url format')
+# type 2 urls
+link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
 
-    clen = int(matches.group(0))
+title = 'Asap Rocky - Keep It G'
 
-    max_chunk_size = 1024
+playlist_name = 'live love asap'
 
-    range_start = 0
-    range_end = max_chunk_size-1
-    range_re = re.compile(r'(?<=(?:\?|&)range=)(\d+-\d+)')
+path = '/home/flok3n/ytdl/asap_rocky_keep_it_g.mp4'
 
-    if not range_re.search(link):
-        raise ValueError('Unsupported url format')
+u1 = 'https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627084195&ei=QwH7YJPQBoyBpASBoJPQCA&ip=185.25.121.191&id=o-AMYdcY3wn_KBw4cDpYPszKBjPt3r9kUBhW1VqTNnf3a9&itag=135&aitags=133%2C134%2C135%2C160%2C242%2C243%2C244%2C278&source=yt_otf&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1140000&vprv=1&mime=video%2Fmp4&ns=cfm3ekAXAvuW_amRt5MHIOwG&otf=1&otfp=1&dur=0.000&lmt=1480857666340217&mt=1627062527&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Ck_xblxAIGKUnA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAL9W4asUpfhePOxLAldnzMYiSc_e1XMT7si0eyZ3B7FJAiEAqpBDzEeS--e9tW8u7nxwzaBjB4FS_6DTmqNLF4oBTMA%3D&alr=yes&sig=AOq0QJ8wRQIgIhPyLdVr7UuiJKK4AMR-eUqD8rY0A6PJVI78ncsNRzoCIQDxKVYLGTUY5KRlJp310c3wNXvZ-N1yBGkvl6AYJ4JYbA%3D%3D&cpn=cJwa-gcELhMk1aTv&cver=2.20210721.00.00&sq=0&rn=1&rbuf=0'
 
-    end_found = False
-
-    while not end_found:
-        if range_end >= clen:
-            range_end = clen - 1
-            end_found = True
-
-        chunk_link = range_re.sub(f'{range_start}-{range_end}', link)
-        yield chunk_link
-        range_start = range_end + 1
-        range_end += max_chunk_size
+u2 = 'https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627084195&ei=QwH7YJPQBoyBpASBoJPQCA&ip=185.25.121.191&id=o-AMYdcY3wn_KBw4cDpYPszKBjPt3r9kUBhW1VqTNnf3a9&itag=251&source=youtube&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1140000&vprv=1&mime=audio%2Fwebm&ns=cfm3ekAXAvuW_amRt5MHIOwG&gir=yes&clen=2899505&otfp=1&dur=182.141&lmt=1563867798213303&mt=1627062527&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Ck_xblxAIGKUnA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgUm1BttH0lEr19PxwdiuEgMFayxeIOIV2Tq9Lt0vj1IICIQCMC7i7O6f9Vi-K-EWr5zqpfLO-yy47CMBU7rKbpGFnuA%3D%3D&alr=yes&sig=AOq0QJ8wRQIgSN6FjSNmANcqFbhdeBHpW51Pg6H7_mLarjKumGhaAFMCIQD1ae2uDMLP-CCDuerMLtmUuPKfrxWhG9qg3gwOK3V9Dw%3D%3D&cpn=cJwa-gcELhMk1aTv&cver=2.20210721.00.00&range=0-66114&rn=2&rbuf=0'
 
 
 if os.fork() == 0:
@@ -114,3 +103,69 @@ else:
 # r = requests.get(u1)
 # pprint(r.headers)
 # pprint(r.status_code)
+
+# t2_url = 'https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627067155&ei=sr76YNvSOdXWyQWD6ofYCw&ip=185.25.121.191&id=o-ACU8i4GSks1YTq4VLKBpQ8OrUmiNqIrxBjEHzq8511CH&itag=135&aitags=133%2C134%2C135%2C160%2C242%2C243%2C244%2C278&source=yt_otf&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1415000&vprv=1&mime=video%2Fmp4&ns=pZ6KS-46thYZfqWHmJE9OuYG&otf=1&otfp=1&dur=0.000&lmt=1480857666340217&mt=1627045254&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Q1G5m63zPxJShw&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAKesu1RO61XRpuKCvHVzOSW1d8lbAJIdEuob8H1tNuWYAiAgBZ1D9GudlCzh8LeS3xq5CMhjVIVP3Re_H8MimZfCfQ%3D%3D&alr=yes&sig=AOq0QJ8wRQIhAOMZIBa1p91KoQKh87PCaLh5_7Nkhy_N79APkwtxH64HAiA36LjF3JfL5w63muPKWJ7lNAQca74a9eLj0HB7FhIEgg%3D%3D&cpn=HMIEkbSZlgdAaZFf&cver=2.20210721.00.00&sq=0&rn=1&rbuf=0'
+
+
+# class PH:
+#     _MAX_SIZE_FETCHING_THREADS = 10
+
+#     def __init__(self, url):
+#         self.url = url
+#         self.seg_count = 38
+
+#     def _init_size_thread_pool(self):
+#         self.task_queue = Queue()
+#         self.threads = []
+
+#         for i, url in enumerate(self._generate_chunk_urls()):
+#             self.task_queue.put((i, url))
+
+#         for i in range(min(self._MAX_SIZE_FETCHING_THREADS, self._get_seg_count())):
+#             self.threads.append(threading.Thread(
+#                 target=self._fetch_content_len))
+
+#         self.seg_sizes = [None] * self._get_seg_count()
+
+#     def _get_seg_count(self) -> int:
+#         if self.seg_count is None:
+#             resp = requests.get(self.url)
+#             seg_re = r'Segment-Count: (\d+)'
+#             self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
+
+#         return self.seg_count
+
+#     def _generate_chunk_urls(self):
+#         seg_re = r'(?<=\?|&)(sq=(\d+))'
+#         matches = re.search(seg_re, self.url)
+
+#         url_pref = self.url[:matches.start(1)]
+#         url_suff = self.url[matches.end(1):]
+
+#         for i in range(self._get_seg_count()):
+#             yield f'{url_pref}sq={i}{url_suff}'
+
+#     def _fetch_content_len(self):
+#         while True:
+#             try:
+#                 idx, url = self.task_queue.get(block=False)
+#                 self.seg_sizes[idx] = int(
+#                     requests.head(url).headers['Content-Length'])
+#             except Empty:
+#                 return
+
+#     def get_size(self):
+#         self._init_size_thread_pool()
+#         for thread in self.threads:
+#             thread.start()
+
+#         for thread in self.threads:
+#             thread.join()
+
+#         return sum(self.seg_sizes)
+
+
+# x = PH(t2_url)
+# start = time.time()
+# print(x.get_size())
+# print(f'{time.time() - start}s')

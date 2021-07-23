@@ -8,6 +8,7 @@ from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
+from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
 import urllib.parse as parse
 import datetime
 
@@ -133,18 +134,15 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             self.ipc_mgr.schedule_dl_task(task)
 
     def _create_data_link(self, url) -> DataLink:
-        query = parse.urlparse(url).query
-        params = parse.parse_qs(query)
-
         try:
-            size = int(params['clen'][0])
-            mime = params['mime'][0]
-            expire = int(params['expire'][0])
-
-            dl = DataLink(url=url, size=size, mime=mime, expire=expire)
+            media_url = create_media_url(url)
+            dl = DataLink(url=url, size=media_url.get_size(),
+                          mime=media_url.get_mime(), expire=media_url.get_expire_time())
             return dl
-        except KeyError:
-            print('Failed to extract ', url)
+        except UnsupportedURLError as e:
+            print(e)
+            exit(2)
+            # TODO handle it
 
     def _create_video_path(self, directory_path: str, title: str,
                            playlist_idx: int = None) -> str:
