@@ -15,3 +15,25 @@ class PlaylistDlManager(ABC):
     def on_dl_progress(self, playlist_link: PlaylistLink,
                        data_link: DataLink, bytes_fetched: int):
         pass
+
+    # single data link
+    @abstractmethod
+    def on_data_link_dled(self, playlist_link: PlaylistLink, data_link: DataLink):
+        pass
+
+    # single link
+    @abstractmethod
+    def on_link_dled(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def on_merge_started(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
+        pass
+
+    @abstractmethod
+    def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
+        pass

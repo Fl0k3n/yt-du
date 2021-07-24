@@ -12,6 +12,7 @@ import re
 import os
 from typing import Generator, Iterable, List, Tuple
 import requests
+from requests import ConnectionError
 import threading
 from queue import Queue, Empty
 from pathlib import Path
@@ -76,7 +77,7 @@ class StatusObserver(ABC):
         pass
 
     @abstractmethod
-    def process_finished(self):
+    def process_finished(self, success: bool):
         pass
 
 
@@ -198,9 +199,13 @@ class SegmentedMediaURL(MediaURL):
     _REQ_PARAMS = ['sq', 'mime', 'expire']
     _MAX_SIZE_FETCHING_THREADS = 10
 
-    def __init__(self, url: str, size: int = None):
+    def __init__(self, url: str, size: int = None,
+                 fetch_retries: int = 5, retry_timeout: int = 0.5):
         self.url = url
         self.size = size
+        self.fetch_retries = fetch_retries
+        self.retry_timeout = retry_timeout
+
         self.seg_count = None
         self.seg_sizes = None
         query = parse.urlparse(self.url).query
@@ -226,9 +231,19 @@ class SegmentedMediaURL(MediaURL):
 
         self.seg_sizes = [None] * self._get_seg_count()
 
+    def _try_request(self, func, *args, **kwargs):
+        for _ in range(self.fetch_retries):
+            try:
+                return func(*args, **kwargs)
+            except (ConnectionError, requests.exceptions.Timeout):
+                pass
+
+        raise ConnectionError('Failed to get segments count')
+
     def _get_seg_count(self) -> int:
         if self.seg_count is None:
-            resp = requests.get(self.url)
+            resp = self._try_request(requests.get,
+                                     self.url, timeout=self.retry_timeout)
             seg_re = r'Segment-Count: (\d+)'
             self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
 
@@ -248,8 +263,9 @@ class SegmentedMediaURL(MediaURL):
         while True:
             try:
                 idx, url = self.task_queue.get(block=False)
-                self.seg_sizes[idx] = int(
-                    requests.head(url).headers['Content-Length'])
+                resp = self._try_request(
+                    requests.head, url, timeout=self.retry_timeout)
+                self.seg_sizes[idx] = int(resp.headers['Content-Length'])
             except Empty:
                 return
 
@@ -354,14 +370,15 @@ class YTDownloader:
         TMP_DIR = PARENT_DIR.joinpath('.tmp')
 
     def __init__(self, path: str, link: str, data_links: List[str], status_obs: StatusObserver = None,
-                 title='unnamed', retries=3, verbose=True, cleanup=True):
+                 title='unnamed', retry_timeout=5, retries=25, verbose=True, cleanup=True):
         """
         Args:
             path (string): absolute path to file where downloaded video should be saved
             link (string): url to video to download
             data_links ([string]): array of data links, for now each video should have 2 (audio.webm + video.mp4)
             title (string): title of video, needed only for logging
-            retries (int): how many times download should be retried
+            retry_timeout(float): seconds after each request is timed out, can be lower if not much parallel dls are performed
+            retries (int): how many times each request should be retried
             verbose (bool): print status to stdout
             cleanup (bool): delete individual media files after merge succeeds
         """
@@ -369,6 +386,7 @@ class YTDownloader:
         self.link = link
         self.title = title
         self.data_links = data_links
+        self.retry_timeout = retry_timeout
         self.retries = retries
         self.verbose = verbose
         self.cleanup = cleanup
@@ -438,13 +456,14 @@ class YTDownloader:
                 while True:
                     try:
                         with open(tmp_file_path, 'wb') as tmp_f:
-                            r = requests.get(chunk_link, stream=True)
+                            r = requests.get(
+                                chunk_link, stream=True, timeout=self.retry_timeout, )
 
                             if not 200 <= r.status_code < 300:
                                 raise ValueError(
                                     f'CHUNK: {i} STATUS: {r.status_code}\n HEADERS: {r.headers}')
 
-                            for chunk in r.raw:
+                            for chunk in r.iter_content(chunk_size=512):
                                 tmp_f.write(chunk)
 
                         if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
@@ -585,6 +604,11 @@ class YTDownloader:
             status, err_log = self._merge_tmp_files()
             if self.status_obs is not None:
                 self.status_obs.merge_finished(status, err_log)
+        else:
+            if self.status_obs is not None:
+                self.status_obs.process_finished(False)
+            # TODO
+            return status, 'FAILED AT DL STAGE'
 
         if status == Codes.SUCCESS and self.verbose:
             print(f"[{self.title}] OK. Merged successfully.")
@@ -608,7 +632,7 @@ def main():
     path, link, title, data_link1, data_link2 = sys.argv[1:]
 
     ytdl = YTDownloader(path, link, [
-                        data_link1, data_link2], title=title, verbose=True, cleanup=True)
+        data_link1, data_link2], title=title, verbose=True, cleanup=True)
 
     status, err_log = ytdl.download()
 

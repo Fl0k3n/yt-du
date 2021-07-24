@@ -25,19 +25,28 @@ class StoredDlTask:
 
 
 class DlManager:
+    _MAX_BATCH_DL = 10
+
     def __init__(self, msger: Messenger):
         self.msger = msger
-        self.MAX_BATCH_DL = 10
         self.subproc_obss: List[SubprocLifetimeObserver] = []
 
         self.task_queue: Deque[StoredDlTask] = deque()
         self.tasks: Dict[int, StoredDlTask] = {}
+
         self.connections: Dict[int, Connection] = {}
+        self.processes: Dict[int, mp.Process] = {}
+
+        self.total_tasks_started = 0
 
         self.handlers = {
             DlCodes.DL_STARTED: self._on_dl_started,
             DlCodes.CAN_PROCEED_DL: self._on_can_proceed_dl,
-            DlCodes.CHUNK_FETCHED: self._on_chunk_fetched
+            DlCodes.CHUNK_FETCHED: self._on_chunk_fetched,
+            DlCodes.DL_FINISHED: self._on_dl_fisnished,
+            DlCodes.MERGE_STARTED: self._on_merge_started,
+            DlCodes.MERGE_FINISHED: self._on_merge_finished,
+            DlCodes.PROCESS_FINISHED: self._on_process_finished
         }
 
         self.id_gen = self._create_task_id_gen()
@@ -48,7 +57,10 @@ class DlManager:
         self.tasks[tid] = s_task
 
         self.task_queue.append(s_task)
-        if len(self.task_queue) < self.MAX_BATCH_DL:
+        self._check_queue()
+
+    def _check_queue(self):
+        if self.task_queue and len(self.processes) < self._MAX_BATCH_DL:
             self._start_download(self.task_queue.popleft())
 
     def _start_download(self, s_task: StoredDlTask):
@@ -67,15 +79,20 @@ class DlManager:
             path, url, dlink1, dlink2, child_con, s_task.task_id))
         proc.start()
 
+        self.total_tasks_started += 1
+
+        self.processes[s_task.task_id] = proc
+
         child_con.close()
 
         for obs in self.subproc_obss:
             obs.on_subproc_created(proc, my_con)
 
-    def _on_chunk_fetched(self, dl_data: DlData):
-        link_id, bytes_fetched = dl_data.data
+    def _on_dl_started(self, dl_data: DlData):
+        link_id = dl_data.data
         task = self._get_task(dl_data)
-        task.chunk_fetched(link_id, bytes_fetched)
+
+        task.dl_started(link_id)
 
     def _on_can_proceed_dl(self, dl_data: DlData):
         link_id = dl_data.data
@@ -87,11 +104,43 @@ class DlManager:
 
         self.msger.send(conn, resp_msg)
 
-    def _on_dl_started(self, dl_data: DlData):
+    def _on_chunk_fetched(self, dl_data: DlData):
+        link_id, bytes_fetched = dl_data.data
+        task = self._get_task(dl_data)
+        task.chunk_fetched(link_id, bytes_fetched)
+
+    def _on_dl_fisnished(self, dl_data: DlData):
         link_id = dl_data.data
         task = self._get_task(dl_data)
+        task.dl_finished(link_id)
 
-        task.dl_started(link_id)
+    def _on_merge_started(self, dl_data: DlData):
+        self._get_task(dl_data).merge_started()
+
+    def _on_merge_finished(self, dl_data: DlData):
+        status, stderr = dl_data.data
+        task = self._get_task(dl_data)
+        task.merge_finished(status, stderr)
+
+    def _on_process_finished(self, dl_data: DlData):
+        success = dl_data.data
+        task = self._get_task(dl_data)
+        task.process_finished(success)
+        tid = dl_data.task_id
+
+        process = self.processes.pop(tid)
+        connection = self.connections.pop(tid)
+
+        for obs in self.subproc_obss:
+            obs.on_subproc_finished(process, connection)
+
+        print('*'*100)
+        print(
+            f'TOTAL TASKS STARTED: {self.total_tasks_started} \
+            PROC LEN IS {len(self.processes)} QUEUE LEN IS {len(self.task_queue)}')
+        print('*'*100)
+
+        self._check_queue()
 
     def msg_rcvd(self, msg: Message):
         # key error raised on unsupported code
@@ -104,7 +153,7 @@ class DlManager:
                         conn: Connection, task_id: int):
         stat_obs = PipedStatusObserver(conn, task_id, Messenger())
         downloader = YTDownloader(
-            path, url, [dlink1, dlink2], stat_obs, cleanup=False)
+            path, url, [dlink1, dlink2], stat_obs, cleanup=True)
         downloader.download()
 
     def _create_task_id_gen(self) -> Generator[int, None, None]:

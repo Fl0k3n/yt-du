@@ -9,7 +9,6 @@ from backend.controller.observers.playlist_modified_observer import PlaylistModi
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
-import urllib.parse as parse
 import datetime
 
 
@@ -29,7 +28,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         self.pl_link_sizes = {}  # link_id -> size in bytes
         self.dled_link_bytes = {}  # link_id -> dled size in bytes
 
-        self.pl_modified_observers: List[PlaylistFetchedObserver] = []
+        self.pl_dling_count = {}  # playlist_id -> count of links currently downloading
+
+        self.pl_modified_observers: List[PlaylistModifiedObserver] = []
 
     def add_pl_modified_observer(self, obs: PlaylistModifiedObserver):
         self.pl_modified_observers.append(obs)
@@ -156,8 +157,26 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
     def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink):
         playlist_link.set_status(DataStatus.DOWNLOADING)
+
+        playlist = playlist_link.playlist
+        pl_id = playlist.playlist_id
+        first_link = False
+
+        # wont be called if count drops to 0 then gets resumed
+        if pl_id not in self.pl_dling_count:
+            self.pl_dling_count[pl_id] = 1
+            playlist.set_status(DataStatus.DOWNLOADING)
+            first_link = True
+        else:
+            self.pl_dling_count[pl_id] += 1
+
         print('DL STARTED for ', playlist_link.title)
         data_link.download_start_time = datetime.datetime.now()
+        self.db.commit()
+
+        if first_link:
+            for obs in self.pl_modified_observers:
+                obs.playlist_dl_started(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
         # TODO check if not paused or smth idk
@@ -224,3 +243,40 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         if playlist_link.link_id not in self.dled_link_bytes:
             self._cache_dled_link_bytes(playlist_link)
         return self.dled_link_bytes[playlist_link.link_id]
+
+    def on_data_link_dled(self, playlist_link: PlaylistLink, data_link: DataLink):
+        print(
+            f'finished downloading {data_link.mime} for {playlist_link.title}')
+        # TODO
+
+    def on_link_dled(self, playlist_link: PlaylistLink):
+        self._clear_link_dl_cache(playlist_link)
+        pl_id = playlist_link.playlist_id
+        self.pl_dling_count[pl_id] -= 1
+        playlist_link.set_status(DataStatus.WAIT_FOR_MERGE)
+        self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_link_dled(playlist_link)
+
+    def on_merge_started(self, playlist_link: PlaylistLink):
+        playlist_link.set_status(DataStatus.MERGING)
+        self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_link_merging(playlist_link)
+
+    def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
+        # TODO
+        pass
+
+    def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
+        # TODO
+        playlist_link.set_status(DataStatus.FINISHED)
+        self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_link_finished(playlist_link)
+
+    def _clear_link_dl_cache(self, playlist_link: PlaylistLink):
+        self.dled_link_bytes.pop(playlist_link.link_id)

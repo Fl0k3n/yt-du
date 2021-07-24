@@ -4,7 +4,7 @@ from backend.controller.observers.playlist_fetched_observer import PlaylistFetch
 from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
 import multiprocessing as mp
 from multiprocessing.connection import Connection, wait
-from typing import List
+from typing import List, Set
 from backend.model.db_models import Playlist
 from backend.subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
@@ -57,7 +57,6 @@ class IPCListener(QObject):
                     continue
                 try:
                     msg = self.msger.recv(rdy_con)
-                    print(f'LISTENER GOT {type(msg)} -> {msg}')
                     self.msg_rcvd.emit(msg)
                 except EOFError:
                     self.connections.remove(rdy_con)
@@ -75,7 +74,7 @@ class IPCManager(SubprocLifetimeObserver):
         # spawn ws server
         # server is listennig for queries
         self.msger = Messenger()
-        self.children: List[mp.Process] = []
+        self.children: Set[mp.Process] = set()
         self._create_listener_thread()
 
         self.ext_manager = ExtManager(self.msger)
@@ -111,32 +110,13 @@ class IPCManager(SubprocLifetimeObserver):
         elif msg.code in self.dl_codes:
             self.dl_manager.msg_rcvd(msg)
         else:
-            print('Unexpected code')
+            raise AttributeError(f'Unexpected IPC code msg: {msg}')
 
     def query_playlist_links(self, playlist: Playlist):
         self.ext_manager.query_playlist_links(playlist)
 
     def schedule_dl_task(self, task: DlTask):
         self.dl_manager.schedule_task(task)
-
-    def on_links_rcvd(self):
-        # contact playlist mgr
-        # mark it as rcvd
-        # ? start dl'ing ???
-        pass
-
-    def start_dl(self, args):
-        # spawn yt_dl proc
-        # give it args neccesary to dl single link
-        # setup listeners for communication with it
-        pass
-
-    def on_dl_msg(self):
-        # figure out which link
-        # figure out if error or smth
-        # contact observers that dl proceeded
-        # if done do non-blocking os.wait
-        pass
 
     def stop(self):
         # TODO
@@ -148,4 +128,11 @@ class IPCManager(SubprocLifetimeObserver):
 
     def on_subproc_created(self, process: mp.Process, con: Connection):
         self.listener.add_connection(con)
-        self.children.append(process)
+        self.children.add(process)
+
+    def on_subproc_finished(self, process: mp.Process, con: Connection):
+        self.children.remove(process)
+        # conn will be removed on broken pipe
+        print('Joining process')
+        process.join()
+        print('Joined')

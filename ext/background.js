@@ -19,7 +19,7 @@ const CODES = {
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5557, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = 5555, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;
@@ -164,7 +164,7 @@ class ConnectionHandler {
 
 class LinkExtractor {
     constructor(communicationHandler) {
-        this.MAX_BATCH_TABS = 10; // if playlist has > 10 links, they will be opened in separete runs
+        this.MAX_BATCH_TABS = 5; // if playlist has > 5 links, they will be opened in separete runs
 
         this.playlists = [];
         this.communicationHandler = communicationHandler;

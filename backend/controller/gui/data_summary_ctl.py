@@ -67,6 +67,8 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         dl_item = playlist.to_data_list_item(
             self._get_playlist_details_cmd(playlist))
 
+        self.displayable_to_view[playlist] = dl_item
+
         self._update_status(playlist)
 
         self.visible_playlists = [dl_item, *self.visible_playlists]
@@ -78,8 +80,14 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self._update_status(playlist)
             self._show_playlist_details(playlist)
 
+    def playlist_dl_started(self, playlist: Playlist):
+        self._update_status(playlist)
+        for el in playlist.links:
+            self._update_status(el)
+
     def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:
+            print('UPDATING VIEW: SETTING STATUS -> ', str(item.get_status()))
             self.displayable_to_view[item].set_status(str(item.get_status()))
 
     def _update_dl_progress(self, item: Displayable,
@@ -95,14 +103,17 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
                            show_details_commands: Iterable[Command]) -> Iterable[DataListItem]:
         res = []
         for item, command in zip(items, show_details_commands):
-            view_item = item.to_data_list_item(command)
-            res.append(view_item)
-            self.displayable_to_view[item] = view_item
-            try:
-                view_item.update_progress_bar(
-                    item.get_downloaded_bytes() / item.get_size_bytes())
-            except ZeroDivisionError:
-                view_item.update_progress_bar(0)
+            if item in self.displayable_to_view:
+                res.append(self.displayable_to_view[item])
+            else:
+                view_item = item.to_data_list_item(command)
+                res.append(view_item)
+                self.displayable_to_view[item] = view_item
+                try:
+                    view_item.update_progress_bar(
+                        item.get_downloaded_bytes() / item.get_size_bytes())
+                except ZeroDivisionError:
+                    view_item.update_progress_bar(0)
         return res
 
     def _get_playlist_details_cmd(self, playlist: Playlist) -> Command:
@@ -131,3 +142,12 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def playlist_dl_progressed(self, playlist: Playlist, playlist_link: PlaylistLink):
         self._update_pl_progress(playlist)
         self._update_link_progress(playlist_link)
+
+    def playlist_link_dled(self, playlist_link: PlaylistLink):
+        self._update_status(playlist_link)
+
+    def playlist_link_merging(self, playlist_link: PlaylistLink):
+        self._update_status(playlist_link)
+
+    def playlist_link_finished(self, playlist_link: PlaylistLink):
+        self._update_status(playlist_link)

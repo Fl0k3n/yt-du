@@ -57,7 +57,7 @@ import re
 # import os
 # import multiprocessing
 
-# type 1 urls
+# type 1 urls(clen)
 # link = 'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX&index=1'
 
 # title = 'Śniący!!! Zbudź się!!!'
@@ -71,7 +71,7 @@ import re
 # u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627076719&ei=D-T6YPbRBMnQyQXGy4nYCg&ip=185.25.121.191&id=o-AP77BqkOr4qzg8ktEiv5YAHe6LFZLEgkV_QSLAGNtdjf&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1155000&vprv=1&mime=audio%2Fwebm&ns=qA075e8toqohCxuH9mRQ6vMG&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1627055088&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=kBDEehZreM1qPg&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIgcj2OlLM0WXkUFrGnPrB-gHnl65Bu7MBpVXbKCFJdRI4CIQD4KAJ_50bAU-WZ0T8P5PRQ8MXKOBHklEnCGhRVrl3mbQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRAIgfeHP-dnKrLwA-CdWwYB0BBqV-SR-d1xVK_Efny5ttqsCIDlFaoPp7-HZllQABCFBcrkrQzK-0qrda3Epk6JEvIhf&alr=yes&cpn=C7jNfo5rbJDeCYyx&cver=2.20210721.00.00&range=0-65812&rn=2&rbuf=0'
 
 
-# type 2 urls
+# type 2 urls(sq)
 link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
 
 title = 'Asap Rocky - Keep It G'

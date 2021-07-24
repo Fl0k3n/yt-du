@@ -3,6 +3,7 @@ from backend.subproc.yt_dl import StatusObserver
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
+from threading import Lock
 
 
 class PipedStatusObserver(StatusObserver):
@@ -10,23 +11,23 @@ class PipedStatusObserver(StatusObserver):
         self.msger = msger
         self.task_id = task_id
         self.conn = conn
+        self.msger_lock = Lock()
 
     def dl_started(self, idx: int):
-        msg = self._create_dl_msg(DlCodes.DL_STARTED, idx)
-        self.msger.send(self.conn, msg)
+        self._send_dl_msg(DlCodes.DL_STARTED, idx)
 
     def dl_finished(self, idx: int):
-        print('[PIPED] dl finished')
+        self._send_dl_msg(DlCodes.DL_FINISHED, idx)
 
     def chunk_fetched(self, idx: int, bytes_len: int):
-        msg = self._create_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len))
-        self.msger.send(self.conn, msg)
+        self._send_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len))
 
     def can_proceed_dl(self, idx: int) -> bool:
-        msg = self._create_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
-        self.msger.send(self.conn, msg)
+        self._send_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
+
         # TODO timeout?
-        response = self.msger.recv(self.conn)
+        with self.msger_lock:
+            response = self.msger.recv(self.conn)
 
         if response.code != DlCodes.DL_PERMISSION:
             # TODO send another msg ?
@@ -36,19 +37,27 @@ class PipedStatusObserver(StatusObserver):
         return response.data
 
     def merge_started(self):
-        print('[PIPED] merge started')
+        msg = self._create_dl_msg(DlCodes.MERGE_STARTED, None)
+        self.msger.send(self.conn, msg)
 
     def merge_finished(self, status: int, stderr: str):
-        print('[PIPED] merge finished')
+        msg = self._create_dl_msg(DlCodes.MERGE_FINISHED, (status, stderr))
+        self.msger.send(self.conn, msg)
+
+    def process_finished(self, success: bool):
+        msg = self._create_dl_msg(DlCodes.PROCESS_FINISHED, success)
+        self.msger.send(self.conn, msg)
+
+    def failed_to_init(self, exc_type: str, exc_msg: str):
+        print('[PIPED] init error')
 
     def dl_error_occured(self, idx: int, exc_type: str, exc_msg: str):
         print('[PIPED] dl error')
 
-    def process_finished(self, success: bool):
-        print('[PIPED] proc finished')
-
     def _create_dl_msg(self, code: DlCodes, data: Any) -> DlData:
         return Message(code, DlData(self.task_id, data))
 
-    def failed_to_init(self, exc_type: str, exc_msg: str):
-        print('[PIPED] init error')
+    def _send_dl_msg(self, code: DlCodes, data: Any):
+        msg = self._create_dl_msg(code, data)
+        with self.msger_lock:
+            self.msger.send(self.conn, msg)

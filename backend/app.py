@@ -27,7 +27,7 @@ class App(QApplication):
 
 
 def main():
-    app = App(sys.argv)
+    app = App(sys.argv, sql_debug=False)
     app.run()
     app.stop()
 

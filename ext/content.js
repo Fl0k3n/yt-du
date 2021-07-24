@@ -1,7 +1,7 @@
 let MAX_RETRIES = 10;
 
 chrome.runtime.onMessage.addListener((req, sender, resp) => {
-    /// BRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRr
+    /// TODO uglyyBRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRr
     setTimeout(function getEm() {
         // const doc = document.querySelector('#header-contents .ytd-playlist-panel-renderer .index-message'); //size
         const aTags = document.querySelectorAll('#items a#wc-endpoint')

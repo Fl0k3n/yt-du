@@ -7,20 +7,22 @@ class DataStatus(Enum):
     FETCH_URLS = 2
     WAIT_FOR_DL = 3
     DOWNLOADING = 4
-    MERGING = 5
-    FINISHED = 6
+    WAIT_FOR_MERGE = 5
+    MERGING = 6
+    FINISHED = 7
 
-    ERRORS = 7
-    PAUSED = 8
+    ERRORS = 8
+    PAUSED = 9
 
     def __str__(self):
         # keep it consistent with these codes
         msgs = [
-            'Undefined'
+            'Undefined',
             'Waiting for Fetch',
             'Fetching Urls',
             'Waiting for Download',
             'Downloading',
+            'Waiting for Merge',
             'Merging',
             'Finished',
             'Errors',
