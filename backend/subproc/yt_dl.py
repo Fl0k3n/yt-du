@@ -320,12 +320,15 @@ def create_media_url(url: str) -> MediaURL:
 
 
 class CircularBuffer:
-    def __init__(self, size):
+    """For bytes only"""
+
+    def __init__(self, size, fill_val=b''):
         self.size = size
+        self.fill_val = fill_val
         self._empty_self()
 
     def _empty_self(self):
-        self.buffer = ['' for _ in range(self.size)]
+        self.buffer = [self.fill_val] * self.size
         self.start = 0
 
     def put(self, data):
@@ -333,11 +336,12 @@ class CircularBuffer:
         l = len(data)
         to_write = min(self.size - self.start, l)
         for i in range(to_write):
-            self.buffer[self.start + i] = data[i]
+            # data[i] converts it to int
+            self.buffer[self.start + i] = data[i:i+1]
 
         left = l - to_write
         for i in range(left):
-            self.buffer[i] = data[to_write + i]
+            self.buffer[i] = data[to_write + i: to_write + i + 1]
 
         self.start = (self.start + l) % self.size
 
@@ -345,13 +349,17 @@ class CircularBuffer:
         return self.buffer[self.start:] + self.buffer[:self.start]
 
     def __str__(self):
-        # only for str-like types
-        return ''.join(self.get())
+        return b''.join(self.get()).decode()
 
     def flush(self):
         data = self.get()
         self._empty_self()
         return data
+
+    def __eq__(self, other):
+        if type(other) == bytes:
+            return b''.join(self.get()) == other
+        return False
 
 
 class Codes(Enum):
@@ -467,9 +475,7 @@ class YTDownloader:
                                 tmp_f.write(chunk)
 
                         if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
-                            self.status_obs.dl_finished(idx)
-                            # self.status_obs.process_finished(False)
-                            # TODO
+                            # TODO dl_stopped or smth
                             break
 
                         # ok chunk read without errors rewrite it to output file
@@ -516,43 +522,39 @@ class YTDownloader:
         # write to its stdin answer
 
         IN_ME, OUT_FMPEG = os.pipe()
-        IN_FMPEG, OUT_ME = os.pipe()
+        # IN_FMPEG, OUT_ME = os.pipe()
         if os.fork() == 0:
             os.close(IN_ME)
-            os.close(OUT_ME)
+            # os.close(OUT_ME)
 
             os.close(sys.stderr.fileno())
             os.close(sys.stdin.fileno())
 
             os.dup2(OUT_FMPEG, sys.stderr.fileno())
-            os.dup2(IN_FMPEG, sys.stdin.fileno())
+            # os.dup2(IN_FMPEG, sys.stdin.fileno())
 
-            os.execlp("ffmpeg", "ffmpeg", *files, '-c', 'copy',
-                      '-strict', 'experimental', self.path)
+            os.execlp("ffmpeg", "ffmpeg", '-y' if accept_all_msgs else '-n',
+                      *files, '-c', 'copy', '-strict', 'experimental', self.path)
         else:
             os.close(OUT_FMPEG)
-            os.close(IN_FMPEG)
-            # TODO definitely use higher-lvl api lmao
-            pattern = '_'.join([str(int.from_bytes(lettr.encode(), "big"))
-                                for lettr in '[y/N]'])
+            # os.close(IN_FMPEG)
+            # pattern = b'[y/N]'
 
-            buffer = CircularBuffer(2 * len(pattern))
+            # buffer = CircularBuffer(len(pattern))
             while True:
-                rd = os.read(IN_ME, 1)
+                rd = os.read(IN_ME, 1)  # TODO
+
                 if rd == b'':
                     break
                 full_err_log.append(rd)
+            #     buffer.put(rd)
 
-                buffer.put(rd)
-                if pattern in '_'.join(str(el) for el in buffer.get()):
-                    out = 'y' if accept_all_msgs else 'N'
-                    # xD
-                    os.write(OUT_ME, ord(out).to_bytes(1, "big"))
-                    os.write(OUT_ME, ord('\n').to_bytes(1, "big"))
-                    buffer.flush()
+            #     if pattern == buffer:
+            #         os.write(OUT_ME, b'y\n' if accept_all_msgs else b'N\n')
+            #         buffer.flush()
 
             os.close(IN_ME)
-            os.close(OUT_ME)
+            # os.close(OUT_ME)
 
             # TODO timeout ?
             _, status = os.wait()

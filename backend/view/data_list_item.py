@@ -3,7 +3,7 @@ from backend.utils.util import open_dir_in_explorer
 from PyQt5.QtCore import QPoint, Qt
 from backend.utils.commands.command import CallRcvrCommand, Command
 from PyQt5 import QtGui
-from PyQt5.QtWidgets import QApplication, QMenu, QProgressBar, QWidget
+from PyQt5.QtWidgets import QApplication, QLabel, QMenu, QProgressBar, QWidget
 
 
 class DataListItem(QWidget):
@@ -19,6 +19,8 @@ class DataListItem(QWidget):
         self.setMaximumHeight(self.HEIGHT)
         self.show_details_command = show_details_command
 
+        self.status_label = QLabel(self.status)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
 
@@ -28,6 +30,7 @@ class DataListItem(QWidget):
 
     def set_status(self, status: str):
         self.status = status
+        self.status_label.setText(status)
 
     def mouseDoubleClickEvent(self, a0: QtGui.QMouseEvent) -> None:
         if self.show_details_command:

@@ -87,7 +87,6 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
 
     def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:
-            print('UPDATING VIEW: SETTING STATUS -> ', str(item.get_status()))
             self.displayable_to_view[item].set_status(str(item.get_status()))
 
     def _update_dl_progress(self, item: Displayable,
@@ -120,7 +119,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         return CallRcvrCommand(self._show_playlist_details, playlist)
 
     def _get_link_details_cmd(self, link: PlaylistLink) -> Command:
-        return CallRcvrCommand(lambda: print("HALO"))
+        return CallRcvrCommand(lambda: print("HALO"))  # TODO show errs
 
     def on_changed_back(self):
         self.displayed_playlist, self.visible_items = self.displayed_items_stack.pop()

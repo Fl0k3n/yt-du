@@ -14,6 +14,6 @@ class LinkListItem(DataListItem):
         self.layout = QHBoxLayout(self)
         self.layout.addWidget(QLabel(str(self.playlist_idx)))
         self.layout.addWidget(QLabel(self.name))
-        self.layout.addWidget(QLabel(self.status))
+        self.layout.addWidget(self.status_label)
 
         self.layout.addWidget(self.progress_bar)

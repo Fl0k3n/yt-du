@@ -25,7 +25,7 @@ class StoredDlTask:
 
 
 class DlManager:
-    _MAX_BATCH_DL = 10
+    _MAX_BATCH_DL = 1
 
     def __init__(self, msger: Messenger):
         self.msger = msger
