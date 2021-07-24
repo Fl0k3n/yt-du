@@ -3,7 +3,9 @@ from backend.subproc.yt_dl import StatusObserver
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
-from threading import Lock
+import threading
+import os
+from queue import Queue
 
 
 class PipedStatusObserver(StatusObserver):
@@ -11,7 +13,18 @@ class PipedStatusObserver(StatusObserver):
         self.msger = msger
         self.task_id = task_id
         self.conn = conn
-        self.msger_lock = Lock()
+        self.sender_lock = threading.Lock()
+
+        self.exit_lock = threading.Lock()
+        self.exit_allowed_cond = threading.Condition(self.exit_lock)
+        self.thread_count = 1
+        self.exit_allowed_by = 1
+        self.exiting = False
+
+        self.msg_queue = Queue()
+
+        self.listener = threading.Thread(
+            target=self._listen_for_msgs, daemon=True).start()
 
     def dl_started(self, idx: int):
         self._send_dl_msg(DlCodes.DL_STARTED, idx)
@@ -23,11 +36,13 @@ class PipedStatusObserver(StatusObserver):
         self._send_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len))
 
     def can_proceed_dl(self, idx: int) -> bool:
+        if self.exiting:
+            return False
+
         self._send_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
 
         # TODO timeout?
-        with self.msger_lock:
-            response = self.msger.recv(self.conn)
+        response = self.msg_queue.get(block=True)
 
         if response.code != DlCodes.DL_PERMISSION:
             # TODO send another msg ?
@@ -59,5 +74,34 @@ class PipedStatusObserver(StatusObserver):
 
     def _send_dl_msg(self, code: DlCodes, data: Any):
         msg = self._create_dl_msg(code, data)
-        with self.msger_lock:
+        with self.sender_lock:
             self.msger.send(self.conn, msg)
+
+    def _listen_for_msgs(self):
+        while True:
+            msg = self.msger.recv(self.conn)
+            if msg.code == DlCodes.TERMINATE:
+                with self.exit_lock:
+                    while self.exit_allowed_by < self.thread_count:
+                        self.exit_allowed_cond.wait()
+                    self.exiting = True
+                os._exit(0)  # TODO maybe use another exit method
+            else:
+                self.msg_queue.put(msg)
+
+    def thread_started(self):
+        self.thread_count += 1
+
+    def thread_finished(self):
+        self.thread_count -= 1
+        if self.thread_count < 1:
+            raise RuntimeError('More threads exited that have been started')
+
+    def forbid_exit(self):
+        with self.exit_lock:
+            self.exit_allowed_by -= 1
+
+    def allow_exit(self):
+        with self.exit_lock:
+            self.exit_allowed_by += 1
+            self.exit_allowed_cond.notify_all()

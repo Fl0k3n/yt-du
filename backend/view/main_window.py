@@ -1,4 +1,4 @@
-from PyQt5 import QtGui
+from PyQt5 import QtCore, QtGui
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QWidget
 from view.options_box import OptionsBox
@@ -11,10 +11,11 @@ class MainWindow(QDialog):
     _FWD_MOUSE_BTN = 16
 
     def __init__(self, data_list: DataSummaryBox, view_changer: DataViewChanger,
-                 playlist_added_cmd: Command):
+                 playlist_added_cmd: Command, close_command: Command):
         super().__init__()
         self.setGeometry(200, 200, 800, 800)
         self.view_changer = view_changer
+        self.close_command = close_command
 
         self.layout = QHBoxLayout(self)
 
@@ -40,3 +41,12 @@ class MainWindow(QDialog):
             self.view_changer.change_forward()
 
         return super().mousePressEvent(a0)
+
+    def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
+        if a0.key() == QtCore.Qt.Key_Escape:
+            self.close()
+        return super().keyPressEvent(a0)
+
+    def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        self.close_command.execute()
+        return super().closeEvent(a0)

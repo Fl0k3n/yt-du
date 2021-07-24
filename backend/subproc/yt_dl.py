@@ -42,7 +42,7 @@ def try_del(name, func=os.remove, msg="Failed to cleanup"):
 
 
 class StatusObserver(ABC):
-    """All download methods have to be thread safe"""
+    """All download & exit methods have to be thread safe"""
 
     @abstractmethod
     def dl_started(self, idx: int):
@@ -78,6 +78,23 @@ class StatusObserver(ABC):
 
     @abstractmethod
     def process_finished(self, success: bool):
+        pass
+
+    @abstractmethod
+    def thread_started(self):
+        pass
+
+    @abstractmethod
+    def thread_finished(self):
+        pass
+
+    # both have to be thread safe
+    @abstractmethod
+    def forbid_exit(self):
+        pass
+
+    @abstractmethod
+    def allow_exit(self):
         pass
 
 
@@ -363,6 +380,7 @@ class CircularBuffer:
 
 
 class Codes(Enum):
+    UNDEFINED = 0
     FETCH_FAILED = 1
     MERGE_FAILED = 2
     SUCCESS = 3
@@ -399,6 +417,9 @@ class YTDownloader:
         self.verbose = verbose
         self.cleanup = cleanup
         self.status_obs = status_obs
+
+        if self.status_obs is not None:
+            self.status_obs.allow_exit()
 
         self.playlist_idx = _get_re_group(r'index=(\d+)', link, 1, 0)
 
@@ -442,7 +463,7 @@ class YTDownloader:
                 self.tmp_files_dir, f'{i}.{ext}'))
 
     def _init_thread_pool(self):
-        self.thread_status = [0] * len(self.data_links)
+        self.thread_status = [Codes.UNDEFINED] * len(self.data_links)
 
         self.threads = [threading.Thread(target=self._fetch, args=(link, media_url, file_name, i))
                         for i, (link, media_url, file_name) in enumerate(
@@ -450,11 +471,11 @@ class YTDownloader:
 
     def _fetch(self, link, media_url, out_file_path, idx):
         """fetches data links in _MAX_CHUNK sizes then merges them"""
-        if self.verbose:
-            print(f"[{self.title}] Fetching: {link[:150]}...")
-
         if self.status_obs is not None:
             self.status_obs.dl_started(idx)
+
+        if self.verbose:
+            print(f"[{self.title}] Fetching: {link[:150]}...")
 
         tmp_file_path = f'{out_file_path}_{idx}'
 
@@ -478,9 +499,17 @@ class YTDownloader:
                             # TODO dl_stopped or smth
                             break
 
+                        # if process gets terminated while writing this chunk
+                        # entire file may become useless
+                        if self.status_obs is not None:
+                            self.status_obs.forbid_exit()
+
                         # ok chunk read without errors rewrite it to output file
                         with open(tmp_file_path, 'rb') as tmp_f:
                             f.write(tmp_f.read())
+
+                        if self.status_obs is not None:
+                            self.status_obs.allow_exit()
 
                         if self.status_obs is not None:
                             self.status_obs.chunk_fetched(idx, chunk_size)
@@ -572,6 +601,9 @@ class YTDownloader:
         """returns True iff downloaded succesfully and ffmpeg stderr log"""
 
         for thread in self.threads:
+            # possible race condition if called after
+            if self.status_obs is not None:
+                self.status_obs.thread_started()
             thread.start()
 
         t_start = time.time()
@@ -581,7 +613,9 @@ class YTDownloader:
         # cant zip because not updated data might be generated
         for i, thread in enumerate(self.threads):
             thread.join()
+
             if self.status_obs is not None:
+                self.status_obs.thread_finished()
                 self.status_obs.dl_finished(i)
 
             if self.thread_status[i] != Codes.SUCCESS:

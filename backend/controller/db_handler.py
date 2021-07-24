@@ -3,9 +3,10 @@ from model.db_models import Base, DataLink, Playlist, PlaylistLink
 from utils.assets_loader import AssetsLoader as AL
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+from backend.controller.gui.app_closed_observer import AppClosedObserver
 
 
-class DBHandler:
+class DBHandler(AppClosedObserver):
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.engine = None
@@ -53,3 +54,7 @@ class DBHandler:
 
     def commit(self):
         self.session.commit()
+
+    def on_app_closed(self):
+        self.session.commit()
+        self.session.close()

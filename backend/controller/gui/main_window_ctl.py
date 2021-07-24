@@ -1,8 +1,8 @@
-from typing import Iterable
-from backend.model.db_models import Playlist, PlaylistLink
+from backend.controller.gui.view_changed_observer import ViewChangedObserver
+from backend.controller.gui.app_closed_observer import AppClosedObserver
+from typing import List
 from backend.view.data_summary_box import DataSummaryBox
 from backend.controller.gui.new_playlist_ctl import NewPlaylistController
-import PyQt5
 from backend.utils.commands.command import CallRcvrCommand
 from backend.controller.playlist_manager import PlaylistManager
 from backend.controller.db_handler import DBHandler
@@ -22,10 +22,17 @@ class MainWindowController(DataViewChanger):
         self.data_view = self.data_summary_ctl.get_data_list_view()
 
         self.view = MainWindow(self.data_view, self, CallRcvrCommand(
-            lambda: self._open_new_playlist_window()))
+            self._open_new_playlist_window), CallRcvrCommand(self._on_window_closed))
 
         self.view_stack = [self.data_view]
-        self.data_view_changed_observers = [self.data_summary_ctl]
+
+        self.data_view_changed_observers: List[ViewChangedObserver] = [
+            self.data_summary_ctl]
+        self.app_closed_observers: List[AppClosedObserver] = [
+            self.db]
+
+    def add_app_closed_observer(self, obs: AppClosedObserver):
+        self.app_closed_observers.append(obs)
 
     def show(self):
         self.view.show()
@@ -57,3 +64,7 @@ class MainWindowController(DataViewChanger):
     def change_forward(self):
         # TODO
         pass
+
+    def _on_window_closed(self):
+        for obs in self.app_closed_observers:
+            obs.on_app_closed()

@@ -8,6 +8,7 @@ from collections import deque
 import multiprocessing as mp
 from backend.subproc.yt_dl import YTDownloader
 from backend.subproc.ipc.piped_status_observer import PipedStatusObserver
+from backend.controller.gui.app_closed_observer import AppClosedObserver
 
 
 class StoredDlTask:
@@ -24,8 +25,8 @@ class StoredDlTask:
         return hash(self.task_id)
 
 
-class DlManager:
-    _MAX_BATCH_DL = 1
+class DlManager(AppClosedObserver):
+    _MAX_BATCH_DL = 10
 
     def __init__(self, msger: Messenger):
         self.msger = msger
@@ -164,3 +165,10 @@ class DlManager:
 
     def _get_task(self, dl_data: DlData) -> DlTask:
         return self.tasks[dl_data.task_id].task
+
+    def on_app_closed(self):
+        self.task_queue.clear()
+        for tid, conn in self.connections.items():
+            self.msger.send(conn, Message(DlCodes.TERMINATE))
+            for obs in self.subproc_obss:
+                obs.on_termination_requested(self.processes[tid], conn)

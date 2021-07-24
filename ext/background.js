@@ -10,16 +10,19 @@ let counter = 0;
 ///////////////////////////////
 // ! keep it consistent with ipc_codes.py ExtCodes
 const CODES = {
+    TERMINATE: 0, // TODO 
     FETCH_PLAYLIST: 1,
     PLAYLIST_FAILED: 3,
     PLAYLIST_FETCHED: 4,
-    PING: 5 //depracated
+    PING: 5, //depracated
+    LOST_CONNECTION: 6, // irrelevant here
+    CONNECTION_NOT_ESTB: 7, // irrelevant here
 }
 ///////////////////////////////
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5555, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = 5556, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;

@@ -1,10 +1,13 @@
+import time
+import threading
+import multiprocessing as mp
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
+from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.model.dl_task import DlTask
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
-import multiprocessing as mp
 from multiprocessing.connection import Connection, wait
-from typing import List, Set
+from typing import Dict, List, Set
 from backend.model.db_models import Playlist
 from backend.subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
@@ -14,7 +17,7 @@ from backend.subproc.ipc.dl_manager import DlManager
 
 class IPCListener(QObject):
     msg_rcvd = pyqtSignal(Message)
-    finished = pyqtSignal()
+    conn_closed = pyqtSignal(Connection)
 
     def __init__(self, msger: Messenger, connections: List[Connection] = None):
         super().__init__()
@@ -36,8 +39,8 @@ class IPCListener(QObject):
         self.conn_mutex.unlock()
 
     def stop(self):
-        # TODO wake here?
         self.keep_listening = False
+        self.wake_up_w.send('')
 
     def run(self):
         while self.keep_listening:
@@ -60,21 +63,23 @@ class IPCListener(QObject):
                     self.msg_rcvd.emit(msg)
                 except EOFError:
                     self.connections.remove(rdy_con)
-                    # TODO
+                    rdy_con.close()
+                    self.conn_closed.emit(rdy_con)
 
             self.conn_mutex.unlock()
 
-        self.finished.emit()
-        # TODO
-        raise RuntimeError('LISTENER FINISHED!!!')
 
+class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
+    # if after this #seconds child is still alive, it will rcv SIGKILL (or mp equivalent)
+    _KILL_CHILDREN_TIMEOUT = 5
+    # non blocking join is issued after this #seconds
+    _JOIN_CHILDREN_TIMEOUT = 1
 
-class IPCManager(SubprocLifetimeObserver):
     def __init__(self):
-        # spawn ws server
-        # server is listennig for queries
         self.msger = Messenger()
         self.children: Set[mp.Process] = set()
+        self.conn_to_child: Dict[Connection, mp.Process] = {}
+
         self._create_listener_thread()
 
         self.ext_manager = ExtManager(self.msger)
@@ -88,14 +93,21 @@ class IPCManager(SubprocLifetimeObserver):
 
         self.ext_manager.start()
 
+        self.app_closed_observers: List[AppClosedObserver] = [
+            self.ext_manager, self.dl_manager]
+
+        # if connection is in this set subprocess exits as expected
+        # info from listener about losing such connection
+        # should be ignored
+        self.expected_dead_connections: Set[Connection] = set()
+
     def _create_listener_thread(self):
         self.listener_thread = QThread()
 
         self.listener = IPCListener(self.msger)
         self.listener.moveToThread(self.listener_thread)
         self.listener.msg_rcvd.connect(self._on_msg_rcvd)
-        self.listener.finished.connect(
-            lambda: print('handle listener finish'))
+        self.listener.conn_closed.connect(self._on_conn_closed)
 
         self.listener_thread.started.connect(self.listener.run)
         self.listener_thread.start()
@@ -112,27 +124,68 @@ class IPCManager(SubprocLifetimeObserver):
         else:
             raise AttributeError(f'Unexpected IPC code msg: {msg}')
 
+    def _on_conn_closed(self, conn: Connection):
+        # this is called when listener detects broken pipe
+        if conn in self.expected_dead_connections:
+            self.expected_dead_connections.remove(conn)
+        else:
+            print('UNEXPECTED DEAD CONNECTION')
+            self.conn_to_child[conn].join()
+
+        self.conn_to_child.pop(conn)
+
     def query_playlist_links(self, playlist: Playlist):
         self.ext_manager.query_playlist_links(playlist)
 
     def schedule_dl_task(self, task: DlTask):
         self.dl_manager.schedule_task(task)
 
-    def stop(self):
-        # TODO
-        print('terminating children.')
-        for child in self.children:
-            if child.is_alive():
-                child.terminate()
-            child.join()
-
     def on_subproc_created(self, process: mp.Process, con: Connection):
         self.listener.add_connection(con)
+        self.conn_to_child[con] = process
         self.children.add(process)
 
     def on_subproc_finished(self, process: mp.Process, con: Connection):
+        # this is called when process finishes as expected
         self.children.remove(process)
+        self.expected_dead_connections.add(con)
+
         # conn will be removed on broken pipe
         print('Joining process')
         process.join()
         print('Joined')
+
+    def on_app_closed(self):
+        for obs in self.app_closed_observers:
+            obs.on_app_closed()
+
+        self.listener.stop()
+        # schedule killer thread
+
+        def kill_em_all():
+            time.sleep(self._JOIN_CHILDREN_TIMEOUT)
+            print('JOINING')
+            to_rm = set()
+            for proc in self.children:
+                if not proc.is_alive():
+                    proc.join()
+                    to_rm.add(proc)
+
+            self.children = self.children.difference(to_rm)
+            if not self.children:
+                print('ALL JOINED')
+                return
+
+            time.sleep(self._KILL_CHILDREN_TIMEOUT)
+            print('TERMINATING')
+            for proc in self.children:
+                if proc.is_alive():
+                    print('CHILD IS STILL ALIVE')
+                    proc.terminate()
+                proc.join()
+
+        threading.Thread(target=kill_em_all).start()
+
+    def on_termination_requested(self, process: mp.Process, con: Connection):
+        # this is called after TERMINATE msg was sent
+        self.expected_dead_connections.add(con)

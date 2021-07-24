@@ -108,9 +108,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             size = 0
             for dlink in dlinks:
                 dl = self._create_data_link(dlink)
+                self.db.add_data_link(dl)
                 dl.link = pl_link
                 pl_link.data_links.append(dl)
-                self.db.add_data_link(dl)
                 size += dl.size
 
             link_sizes.append(size)

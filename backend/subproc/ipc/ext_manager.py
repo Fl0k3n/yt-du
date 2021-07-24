@@ -8,9 +8,10 @@ import multiprocessing as mp
 from multiprocessing.connection import Connection
 from subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
+from backend.controller.gui.app_closed_observer import AppClosedObserver
 
 
-class ExtManager:
+class ExtManager(AppClosedObserver):
     def __init__(self, msger: Messenger):
         self.msger = msger
 
@@ -18,7 +19,9 @@ class ExtManager:
         self.subproc_obss: List[SubprocLifetimeObserver] = []
 
         self.msg_handlers = {
-            ExtCodes.PLAYLIST_FETCHED: self._on_playlist_fetched
+            ExtCodes.PLAYLIST_FETCHED: self._on_playlist_fetched,
+            ExtCodes.CONNECTION_NOT_ESTB: self._on_conn_not_estb,
+            ExtCodes.LOST_CONNECTION: self._on_conn_lost,
         }
 
     def start(self):
@@ -69,6 +72,21 @@ class ExtManager:
             obs.on_playlist_fetched(
                 playlist_id, playlist_idxs, links, titles, data_links)
 
+    def _on_conn_lost(self, msg: Message):
+        still_alive = msg.data
+        if still_alive == 0:
+            # TODO
+            print('LOST ALL WS CONNECTIONS')
+
+    def _on_conn_not_estb(self, msg: Message):
+        # TODO
+        print('RCVD TASK BUT CONNECTION NOT ESTB')
+
     def _get_playlist_idx(self, url: str):
         query = parse.urlparse(url).query
         return int(parse.parse_qs(query)['index'][0])
+
+    def on_app_closed(self):
+        self.msger.send(self.ext_conn, Message(ExtCodes.TERMINATE))
+        for obs in self.subproc_obss:
+            obs.on_termination_requested(self.ext_proc, self.ext_conn)
