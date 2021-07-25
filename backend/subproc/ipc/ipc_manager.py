@@ -71,7 +71,7 @@ class IPCListener(QObject):
 
 class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
     # if after this #seconds child is still alive, it will rcv SIGKILL (or mp equivalent)
-    _KILL_CHILDREN_TIMEOUT = 5
+    _KILL_CHILDREN_TIMEOUT = 1
     # non blocking join is issued after this #seconds
     _JOIN_CHILDREN_TIMEOUT = 1
 
@@ -137,8 +137,8 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
     def query_playlist_links(self, playlist: Playlist):
         self.ext_manager.query_playlist_links(playlist)
 
-    def schedule_dl_task(self, task: DlTask):
-        self.dl_manager.schedule_task(task)
+    def schedule_dl_task(self, task: DlTask) -> int:
+        return self.dl_manager.schedule_task(task)
 
     def on_subproc_created(self, process: mp.Process, con: Connection):
         self.listener.add_connection(con)
@@ -189,3 +189,7 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
     def on_termination_requested(self, process: mp.Process, con: Connection):
         # this is called after TERMINATE msg was sent
         self.expected_dead_connections.add(con)
+
+    def pause_dl(self, task_id: int) -> bool:
+        """returns True if task was running """
+        return self.dl_manager.pause_task(task_id)

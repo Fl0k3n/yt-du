@@ -17,6 +17,10 @@ class PlaylistModifiedObserver(ABC):
         pass
 
     @abstractmethod
+    def link_dl_started(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
     def playlist_dl_progressed(self, playlist: Playlist, playlist_link: PlaylistLink):
         pass
 
@@ -30,4 +34,24 @@ class PlaylistModifiedObserver(ABC):
 
     @abstractmethod
     def playlist_link_finished(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def playlist_finished(self, playlist: Playlist):
+        pass
+
+    @abstractmethod
+    def playlist_link_paused(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def playlist_paused(self, playlist: Playlist):
+        pass
+
+    @abstractmethod
+    def playlist_link_pause_requested(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def playlist_pause_requested(self, playlist: Playlist):
         pass

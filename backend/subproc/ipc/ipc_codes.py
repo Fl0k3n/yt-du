@@ -37,3 +37,5 @@ class DlCodes(Enum):
     MERGE_FINISHED = 7
     # data: bool = whether process was successful
     PROCESS_FINISHED = 8
+    # data: None
+    PROCESS_STOPPED = 9

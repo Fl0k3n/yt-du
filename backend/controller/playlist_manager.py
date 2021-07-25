@@ -2,7 +2,7 @@ from backend.model.playlist_link_task import PlaylistLinkTask
 from backend.controller.playlist_dl_manager import PlaylistDlManager
 from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
-from typing import Iterable, List
+from typing import Dict, Iterable, List, Set
 from backend.controller.db_handler import DBHandler
 from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
@@ -10,6 +10,7 @@ from backend.controller.observers.playlist_fetched_observer import PlaylistFetch
 from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
 import datetime
+from collections import defaultdict
 
 
 class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
@@ -18,17 +19,37 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         self.ipc_mgr = ipc_mgr
 
         self.ipc_mgr.add_playlist_fetched_observer(self)
-        self.loaded_playlists = []  # list of loaded playlists
-        self.pl_url_map = {}  # playlist_url -> idx in list above
-        self.pl_idx_map = {}  # playlist_id  -> idx in list above
+        self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
+        # playlist_url -> idx in list above
+        self.pl_url_map: Dict[str, int] = {}
+        # playlist_id  -> idx in list above
+        self.pl_idx_map: Dict[int, int] = {}
 
-        self.pl_sizes = {}  # playlist_id -> size in bytes
-        self.dled_pl_bytes = {}  # playlist_id -> dled size in bytes
+        self.pl_sizes: Dict[int, int] = {}  # playlist_id -> size in bytes
+        # playlist_id -> dled size in bytes
+        self.dled_pl_bytes: Dict[int, int] = {}
 
-        self.pl_link_sizes = {}  # link_id -> size in bytes
-        self.dled_link_bytes = {}  # link_id -> dled size in bytes
+        self.pl_link_sizes: Dict[int, int] = {}  # link_id -> size in bytes
+        # link_id -> dled size in bytes
+        self.dled_link_bytes: Dict[int, int] = {}
 
-        self.pl_dling_count = {}  # playlist_id -> count of links currently downloading
+        # playlist_id -> count of links currently downloading
+        self.pl_dling_count: Dict[int, int] = {}
+
+        # link_id -> count of data_links currently downloading
+        self.link_dling_count: Dict[int, int] = {}
+
+        # playlist_id -> {playlist_link -> task_id}
+        # ids of scheduled link downloads for given playlist
+        self.pl_tasks: Dict[int, Dict[PlaylistLink, int]] = {}
+
+        # playlists that were requested to be paused
+        self.pl_pause_requests: Set[Playlist] = set()
+        # links that were requested to be paused
+        self.link_pause_requests: Set[PlaylistLink] = set()
+        # playlist -> # of links requested to be paused
+        self.pl_links_pause_req_count: Dict[Playlist, int] = defaultdict(
+            lambda: 0)
 
         self.pl_modified_observers: List[PlaylistModifiedObserver] = []
 
@@ -92,6 +113,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
         playlist = self.get_playlist(id=playlist_id)
         playlist.set_status(DataStatus.WAIT_FOR_DL)
+        link_task_ids = {}
         link_sizes = []
         pl_links = []
 
@@ -124,15 +146,18 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         self.pl_sizes[playlist.playlist_id] = sum(link_sizes)
         self.dled_pl_bytes[playlist.playlist_id] = 0
 
-        for obs in self.pl_modified_observers:
-            obs.playlist_links_added(playlist)
-
         for pl_link in pl_links:
             path = self._create_video_path(
                 playlist.directory_path, pl_link.title, pl_link.playlist_number)
             task = PlaylistLinkTask(
                 pl_link, self, path, pl_link.url, pl_link.data_links)
-            self.ipc_mgr.schedule_dl_task(task)
+            task_id = self.ipc_mgr.schedule_dl_task(task)
+            link_task_ids[pl_link] = task_id
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_links_added(playlist)
+
+        self.pl_tasks[playlist_id] = link_task_ids
 
     def _create_data_link(self, url) -> DataLink:
         try:
@@ -156,11 +181,18 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         return str(dir.joinpath(filename).absolute())
 
     def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink):
-        playlist_link.set_status(DataStatus.DOWNLOADING)
-
         playlist = playlist_link.playlist
         pl_id = playlist.playlist_id
+        link_id = playlist_link.link_id
         first_link = False
+        first_data_link = False
+
+        if link_id not in self.link_dling_count:
+            self.link_dling_count[link_id] = 1
+            playlist_link.set_status(DataStatus.DOWNLOADING)
+            first_data_link = True
+        else:
+            self.link_dling_count[link_id] += 1
 
         # wont be called if count drops to 0 then gets resumed
         if pl_id not in self.pl_dling_count:
@@ -174,13 +206,16 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         data_link.download_start_time = datetime.datetime.now()
         self.db.commit()
 
+        if first_data_link:
+            for obs in self.pl_modified_observers:
+                obs.link_dl_started(playlist_link)
+
         if first_link:
             for obs in self.pl_modified_observers:
                 obs.playlist_dl_started(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
-        # TODO check if not paused or smth idk
-        return True
+        return playlist_link not in self.link_pause_requests
 
     def on_dl_progress(self, playlist_link: PlaylistLink,
                        data_link: DataLink, bytes_fetched: int):
@@ -223,6 +258,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             size += self.dled_link_bytes[link.link_id]
         self.dled_pl_bytes[playlist.playlist_id] = size
 
+    def _clear_link_dl_cache(self, playlist_link: PlaylistLink):
+        self.dled_link_bytes.pop(playlist_link.link_id)
+
     def get_playlist_size_bytes(self, playlist: Playlist) -> int:
         if playlist.playlist_id not in self.pl_sizes:
             self._cache_playlist_size(playlist)
@@ -247,12 +285,13 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
     def on_data_link_dled(self, playlist_link: PlaylistLink, data_link: DataLink):
         print(
             f'finished downloading {data_link.mime} for {playlist_link.title}')
-        # TODO
+        self.link_dling_count[playlist_link.link_id] -= 1
 
     def on_link_dled(self, playlist_link: PlaylistLink):
         self._clear_link_dl_cache(playlist_link)
         pl_id = playlist_link.playlist_id
         self.pl_dling_count[pl_id] -= 1
+        self.link_dling_count.pop(playlist_link.link_id)
         playlist_link.set_status(DataStatus.WAIT_FOR_MERGE)
         self.db.commit()
 
@@ -267,8 +306,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             obs.playlist_link_merging(playlist_link)
 
     def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
-        # TODO
-        pass
+        pass  # probably nothing to do
 
     def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
         # TODO
@@ -278,5 +316,103 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         for obs in self.pl_modified_observers:
             obs.playlist_link_finished(playlist_link)
 
-    def _clear_link_dl_cache(self, playlist_link: PlaylistLink):
-        self.dled_link_bytes.pop(playlist_link.link_id)
+        pl_id = playlist_link.playlist.playlist_id
+        self.pl_tasks[pl_id].pop(playlist_link)
+
+        playlist = playlist_link.playlist
+
+        if self._is_playlist_finished(playlist):
+            playlist.set_status(DataStatus.FINISHED)
+            self.db.commit()
+            obs.playlist_finished(playlist)
+        elif self._is_playlist_paused(playlist):
+            playlist.set_status(DataStatus.PAUSED)
+            self.db.commit()
+            obs.playlist_paused(playlist)
+
+    def on_process_paused(self, playlist_link: PlaylistLink):
+        self.link_pause_requests.remove(playlist_link)
+        self.pl_links_pause_req_count[playlist_link.playlist] -= 1
+        self.pl_tasks[playlist_link.playlist.playlist_id].pop(playlist_link)
+
+        playlist_link.set_status(DataStatus.PAUSED)
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_link_paused(playlist_link)
+
+        playlist = playlist_link.playlist
+
+        if self._is_playlist_paused(playlist):
+            playlist.set_status(DataStatus.PAUSED)
+
+            for obs in self.pl_modified_observers:
+                obs.playlist_paused(playlist)
+
+            try:
+                self.pl_pause_requests.remove(playlist)
+            except KeyError:  # links were queried for pause individually
+                pass
+
+        self.db.commit()
+
+    # BRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
+
+    def on_playlist_pause_requested(self, playlist: Playlist):
+        self.pl_pause_requests.add(playlist)
+
+        not_running = []
+        for link in self.pl_tasks[playlist.playlist_id].keys():
+            running = self.on_link_pause_requested(link, inner_call=True)
+            if not running:
+                not_running.append(link)
+
+        for link in not_running:
+            link.set_status(DataStatus.PAUSED)
+            for obs in self.pl_modified_observers:
+                obs.playlist_link_paused(link)
+
+        self.db.commit()
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_pause_requested(playlist)
+
+    def on_link_pause_requested(self, playlist_link: PlaylistLink, inner_call: bool = False) -> bool:
+        self.link_pause_requests.add(playlist_link)
+        self.pl_links_pause_req_count[playlist_link.playlist] += 1
+
+        task_id = self.pl_tasks[playlist_link.playlist.playlist_id][playlist_link]
+        running = self.ipc_mgr.pause_dl(task_id)
+
+        for obs in self.pl_modified_observers:
+            obs.playlist_link_pause_requested(playlist_link)
+
+        if not inner_call and not any(self.is_link_pausable(
+                link) for link in playlist_link.playlist.links):
+            for obs in self.pl_modified_observers:
+                obs.playlist_pause_requested(playlist_link.playlist)
+
+        return running
+
+    def is_playlist_pausable(self, playlist: Playlist) -> bool:
+        return playlist not in self.pl_pause_requests and \
+            playlist.get_status() in {
+                DataStatus.WAIT_FOR_DL, DataStatus.DOWNLOADING}
+
+    def is_link_pausable(self, playlist_link: PlaylistLink) -> bool:
+        return playlist_link not in self.link_pause_requests and \
+            playlist_link.get_status() in {
+                DataStatus.WAIT_FOR_DL, DataStatus.DOWNLOADING
+            }
+
+    def is_playlist_resumable(self, playlist: Playlist) -> bool:
+        return True
+
+    def is_link_resumable(self, playlist_link: PlaylistLink) -> bool:
+        return True
+
+    def _is_playlist_finished(self, playlist: Playlist) -> bool:
+        return all(link.get_status() == DataStatus.FINISHED for link in playlist.links)
+
+    def _is_playlist_paused(self, playlist: Playlist) -> bool:
+        return all(link.get_status() in {DataStatus.FINISHED,
+                                         DataStatus.PAUSED} for link in playlist.links)

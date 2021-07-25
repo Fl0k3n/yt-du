@@ -47,7 +47,11 @@ class DlTask(ABC):
     def process_finished(self, success: bool):
         pass
 
-    def are_all_downlaods_finished(self) -> bool:
+    @abstractmethod
+    def process_stopped(self):
+        pass
+
+    def are_all_downloads_finished(self) -> bool:
         return self.finished_dls == len(self.data_links)
 
     def __str__(self):

@@ -9,6 +9,8 @@ from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func, text
 from model.displayable import Displayable
 
+# TODO Rewrite all of them using wrapper classes so polymorphism can be used and
+# playlist manager doesnt look like gowno kurwa jego mac
 
 Base = declarative_base()
 
@@ -38,9 +40,14 @@ class Playlist(Base, Displayable):
     links = relationship("PlaylistLink", back_populates="playlist",
                          order_by="PlaylistLink.playlist_number")
 
-    def to_data_list_item(self, show_details_command: Command, parent: QWidget = None) -> PlaylistListItem:
+    def to_data_list_item(self, show_details_command: Command,
+                          pause_command: Command, resume_command: Command,
+                          is_pausable: bool, is_resumable: bool,
+                          parent: QWidget = None) -> PlaylistListItem:
         return PlaylistListItem(self.name, self.url, self.directory_path, str(self.get_status()),
-                                show_details_command=show_details_command, parent=parent)
+                                show_details_command=show_details_command,
+                                pause_command=pause_command, resume_command=resume_command,
+                                is_pausable=is_pausable, is_resumable=is_resumable, parent=parent)
 
     def get_downloaded_bytes(self) -> int:
         return sum(link.get_downloaded_bytes() for link in self.links)
@@ -79,12 +86,16 @@ class PlaylistLink(Base, Displayable):
     data_links = relationship('DataLink', back_populates='link')
     merges = relationship('MergeData', back_populates='link')
 
-    def to_data_list_item(self, show_details_command: Command, parent: QWidget = None) -> LinkListItem:
+    def to_data_list_item(self, show_details_command: Command,
+                          pause_command: Command, resume_command: Command,
+                          is_pausable: bool, is_resumable: bool,
+                          parent: QWidget = None) -> LinkListItem:
         path = self.playlist.directory_path
-        print('CREATING LINKS')
+
         return LinkListItem(self.playlist_number, self.title, self.url, path,
                             str(self.get_status()), show_details_command=show_details_command,
-                            parent=parent)
+                            pause_command=pause_command, resume_command=resume_command,
+                            is_pausable=is_pausable, is_resumable=is_resumable, parent=parent)
 
     def get_downloaded_bytes(self) -> int:
         return sum(dlink.downloaded for dlink in self.data_links)

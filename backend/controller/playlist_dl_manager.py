@@ -37,3 +37,7 @@ class PlaylistDlManager(ABC):
     @abstractmethod
     def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
         pass
+
+    @abstractmethod
+    def on_process_paused(self, playlist_link: PlaylistLink):
+        pass

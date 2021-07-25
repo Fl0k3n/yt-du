@@ -39,7 +39,7 @@ class NewPlaylistWindow(QDialog):
 
         # # LONG
         # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=3f-eCQ00tP8&list=PL-3XmUCH8wflJNQSFzqooCEloXXZqBPOE')
+        #     'https://www.youtube.com/watch?v=N_re96JNjxE&list=PL-3XmUCH8wflSD1mcS9VU6g5VtlCTtqOu')
         # self.name_input.setText('GIMPER TEST')
         # self.path_input.setText('/home/flok3n/music')
 

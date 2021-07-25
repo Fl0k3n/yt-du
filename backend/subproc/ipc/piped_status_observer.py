@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Any, Set
 from backend.subproc.yt_dl import StatusObserver
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
 import threading
+from signal import SIGINT
 import os
 from queue import Queue
 
@@ -17,14 +18,19 @@ class PipedStatusObserver(StatusObserver):
 
         self.exit_lock = threading.Lock()
         self.exit_allowed_cond = threading.Condition(self.exit_lock)
-        self.thread_count = 1
+        self.thread_count = 1  # excluding listener thread of this class
         self.exit_allowed_by = 1
         self.exiting = False
+
+        self.child_pids: Set[int] = set()
+        self.children_lock = threading.Lock()
 
         self.msg_queue = Queue()
 
         self.listener = threading.Thread(
-            target=self._listen_for_msgs, daemon=True).start()
+            target=self._listen_for_msgs, daemon=True)
+
+        self.listener.start()
 
     def dl_started(self, idx: int):
         self._send_dl_msg(DlCodes.DL_STARTED, idx)
@@ -50,6 +56,10 @@ class PipedStatusObserver(StatusObserver):
             exit(1)
 
         return response.data
+
+    def process_stopped(self):
+        msg = self._create_dl_msg(DlCodes.PROCESS_STOPPED, None)
+        self.msger.send(self.conn, msg)
 
     def merge_started(self):
         msg = self._create_dl_msg(DlCodes.MERGE_STARTED, None)
@@ -85,7 +95,11 @@ class PipedStatusObserver(StatusObserver):
                     while self.exit_allowed_by < self.thread_count:
                         self.exit_allowed_cond.wait()
                     self.exiting = True
-                os._exit(0)  # TODO maybe use another exit method
+
+                with self.children_lock:
+                    for pid in self.child_pids:
+                        os.kill(pid, SIGINT)
+                    os._exit(0)  # TODO maybe use another exit method
             else:
                 self.msg_queue.put(msg)
 
@@ -105,3 +119,15 @@ class PipedStatusObserver(StatusObserver):
         with self.exit_lock:
             self.exit_allowed_by += 1
             self.exit_allowed_cond.notify_all()
+
+    def allow_subproc_start(self):
+        self.children_lock.acquire()
+
+    def subprocess_started(self, pid: int):
+        # called after asking for permission so lock is held
+        self.child_pids.add(pid)
+        self.children_lock.release()
+
+    def subprocess_finished(self, pid: int):
+        with self.children_lock:
+            self.child_pids.remove(pid)

@@ -9,7 +9,10 @@ from view.data_list_item import DataListItem
 
 class Displayable:
     @abstractmethod
-    def to_data_list_item(self, show_details_command: Command, parent: QWidget) -> DataListItem:
+    def to_data_list_item(self, show_details_command: Command,
+                          pause_command: Command, resume_command: Command,
+                          is_pausable: bool, is_resumable: bool,
+                          parent: QWidget) -> DataListItem:
         pass
 
     @abstractmethod

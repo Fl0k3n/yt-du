@@ -21,6 +21,7 @@ class DataSummaryBox(QFrame):
         self.visible_widgets = []
 
         self.inner_layout = QVBoxLayout()
+        self.inner_layout.setSpacing(2)
         self.inner_widget.setLayout(self.inner_layout)
 
     def show_all(self, items: Iterable[DataListItem]):

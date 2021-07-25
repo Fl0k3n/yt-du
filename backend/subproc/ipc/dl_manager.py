@@ -1,7 +1,7 @@
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
 from backend.model.dl_task import DlTask
-from typing import Deque, Dict, Generator, List
+from typing import Deque, Dict, Generator, List, Set
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.subproc.ipc.message import DlData, Message, Messenger
 from collections import deque
@@ -38,6 +38,9 @@ class DlManager(AppClosedObserver):
         self.connections: Dict[int, Connection] = {}
         self.processes: Dict[int, mp.Process] = {}
 
+        self.paused_tasks: Set[StoredDlTask] = set()
+        self.running_tasks: Set[StoredDlTask] = set()
+
         self.total_tasks_started = 0
 
         self.handlers = {
@@ -47,22 +50,29 @@ class DlManager(AppClosedObserver):
             DlCodes.DL_FINISHED: self._on_dl_fisnished,
             DlCodes.MERGE_STARTED: self._on_merge_started,
             DlCodes.MERGE_FINISHED: self._on_merge_finished,
-            DlCodes.PROCESS_FINISHED: self._on_process_finished
+            DlCodes.PROCESS_FINISHED: self._on_process_finished,
+            DlCodes.PROCESS_STOPPED: self._on_process_stopped
         }
 
         self.id_gen = self._create_task_id_gen()
 
-    def schedule_task(self, task: DlTask):
+    def schedule_task(self, task: DlTask) -> int:
         tid = next(self.id_gen)
         s_task = StoredDlTask(task, tid)
         self.tasks[tid] = s_task
 
         self.task_queue.append(s_task)
         self._check_queue()
+        return tid
 
     def _check_queue(self):
         if self.task_queue and len(self.processes) < self._MAX_BATCH_DL:
-            self._start_download(self.task_queue.popleft())
+            task = self.task_queue.popleft()
+            if task not in self.paused_tasks:
+                self._start_download(task)
+            else:
+                # task can be enqueued only once
+                self.paused_tasks.remove(task)
 
     def _start_download(self, s_task: StoredDlTask):
         task = s_task.task
@@ -80,6 +90,7 @@ class DlManager(AppClosedObserver):
             path, url, dlink1, dlink2, child_con, s_task.task_id))
         proc.start()
 
+        self.running_tasks.add(s_task)
         self.total_tasks_started += 1
 
         self.processes[s_task.task_id] = proc
@@ -99,6 +110,7 @@ class DlManager(AppClosedObserver):
         link_id = dl_data.data
         task = self._get_task(dl_data)
         permission = task.dl_permission_requested(link_id)
+        print('SENDING PERMISSION: ', permission)
 
         conn = self.connections[dl_data.task_id]
         resp_msg = Message(DlCodes.DL_PERMISSION, permission)
@@ -123,17 +135,22 @@ class DlManager(AppClosedObserver):
         task = self._get_task(dl_data)
         task.merge_finished(status, stderr)
 
+    def _clean_process_task(self, tid: int):
+        process = self.processes.pop(tid)
+        connection = self.connections.pop(tid)
+        s_task = self.tasks.pop(tid)
+        self.running_tasks.remove(s_task)
+
+        for obs in self.subproc_obss:
+            obs.on_subproc_finished(process, connection)
+
     def _on_process_finished(self, dl_data: DlData):
         success = dl_data.data
         task = self._get_task(dl_data)
         task.process_finished(success)
         tid = dl_data.task_id
 
-        process = self.processes.pop(tid)
-        connection = self.connections.pop(tid)
-
-        for obs in self.subproc_obss:
-            obs.on_subproc_finished(process, connection)
+        self._clean_process_task(tid)
 
         print('*'*100)
         print(
@@ -141,6 +158,15 @@ class DlManager(AppClosedObserver):
             PROC LEN IS {len(self.processes)} QUEUE LEN IS {len(self.task_queue)}')
         print('*'*100)
 
+        self._check_queue()
+
+    def _on_process_stopped(self, dl_data: DlData):
+        # rcvd after process was paused
+        task = self._get_task(dl_data)
+        task.process_stopped()
+
+        tid = dl_data.task_id
+        self._clean_process_task(tid)
         self._check_queue()
 
     def msg_rcvd(self, msg: Message):
@@ -172,3 +198,16 @@ class DlManager(AppClosedObserver):
             self.msger.send(conn, Message(DlCodes.TERMINATE))
             for obs in self.subproc_obss:
                 obs.on_termination_requested(self.processes[tid], conn)
+
+    def pause_task(self, tid: int) -> bool:
+        """returns True if task was running """
+        # only enqueued tasks wont be started
+        # this has no effect on already running / finished ones
+        try:
+            task = self.tasks[tid]
+            if task not in self.running_tasks:
+                self.paused_tasks.add(task)
+                return False
+            return True
+        except KeyError:
+            print(f'Task {tid} is already finished')

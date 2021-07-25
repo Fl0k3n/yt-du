@@ -42,7 +42,7 @@ def try_del(name, func=os.remove, msg="Failed to cleanup"):
 
 
 class StatusObserver(ABC):
-    """All download & exit methods have to be thread safe"""
+    """All download, exit, subproc creation methods have to be thread safe"""
 
     @abstractmethod
     def dl_started(self, idx: int):
@@ -58,6 +58,11 @@ class StatusObserver(ABC):
 
     @abstractmethod
     def can_proceed_dl(self, idx: int) -> bool:
+        pass
+
+    # sent if dl permission was denied
+    @abstractmethod
+    def process_stopped(self):
         pass
 
     @abstractmethod
@@ -76,6 +81,7 @@ class StatusObserver(ABC):
     def failed_to_init(self, exc_type: str, exc_msg: str):
         pass
 
+    # sent if process terminates itself
     @abstractmethod
     def process_finished(self, success: bool):
         pass
@@ -95,6 +101,19 @@ class StatusObserver(ABC):
 
     @abstractmethod
     def allow_exit(self):
+        pass
+
+    # all subproc functions have to be thread save
+    @abstractmethod
+    def allow_subproc_start():
+        pass
+
+    @abstractmethod
+    def subprocess_started(self, pid: int):
+        pass
+
+    @abstractmethod
+    def subprocess_finished(self, pid: int):
         pass
 
 
@@ -384,6 +403,7 @@ class Codes(Enum):
     FETCH_FAILED = 1
     MERGE_FAILED = 2
     SUCCESS = 3
+    DL_PERMISSION_DENIED = 4
 
 
 class YTDownloader:
@@ -496,8 +516,9 @@ class YTDownloader:
                                 tmp_f.write(chunk)
 
                         if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
-                            # TODO dl_stopped or smth
-                            break
+                            self.thread_status[idx] = Codes.DL_PERMISSION_DENIED
+                            try_del(tmp_file_path)
+                            return
 
                         # if process gets terminated while writing this chunk
                         # entire file may become useless
@@ -508,11 +529,11 @@ class YTDownloader:
                         with open(tmp_file_path, 'rb') as tmp_f:
                             f.write(tmp_f.read())
 
-                        if self.status_obs is not None:
-                            self.status_obs.allow_exit()
+                        f.flush()
 
                         if self.status_obs is not None:
                             self.status_obs.chunk_fetched(idx, chunk_size)
+                            self.status_obs.allow_exit()
 
                         break
                     except Exception as e:
@@ -547,12 +568,15 @@ class YTDownloader:
         full_err_log = []
 
         # TODO maybe higher-lvl api
-        # just pass stderr of ffmpeg here and if [y/N] is encountered
-        # write to its stdin answer
 
         IN_ME, OUT_FMPEG = os.pipe()
         # IN_FMPEG, OUT_ME = os.pipe()
-        if os.fork() == 0:
+
+        if self.status_obs is not None:
+            self.status_obs.allow_subproc_start()
+            
+        pid = os.fork()
+        if pid == 0:
             os.close(IN_ME)
             # os.close(OUT_ME)
 
@@ -565,6 +589,9 @@ class YTDownloader:
             os.execlp("ffmpeg", "ffmpeg", '-y' if accept_all_msgs else '-n',
                       *files, '-c', 'copy', '-strict', 'experimental', self.path)
         else:
+            if self.status_obs is not None:
+                self.status_obs.subprocess_started(pid)
+
             os.close(OUT_FMPEG)
             # os.close(IN_FMPEG)
             # pattern = b'[y/N]'
@@ -585,8 +612,11 @@ class YTDownloader:
             os.close(IN_ME)
             # os.close(OUT_ME)
 
-            # TODO timeout ?
-            _, status = os.wait()
+            pid_, status = os.wait()
+
+            if self.status_obs is not None:
+                self.status_obs.subprocess_finished(pid)
+
             return Codes.SUCCESS if status == 0 else Codes.MERGE_FAILED, \
                 b''.join(full_err_log).decode()
 
@@ -610,19 +640,34 @@ class YTDownloader:
 
         status = Codes.SUCCESS  # no errors yet
 
+        permission_denied = False
+
         # cant zip because not updated data might be generated
         for i, thread in enumerate(self.threads):
             thread.join()
 
             if self.status_obs is not None:
                 self.status_obs.thread_finished()
+
+            if self.thread_status[i] == Codes.DL_PERMISSION_DENIED:
+                permission_denied = True
+                # all threads have to be joined
+                continue
+
+            if self.status_obs is not None:
                 self.status_obs.dl_finished(i)
 
-            if self.thread_status[i] != Codes.SUCCESS:
+            if self.thread_status[i] not in {Codes.SUCCESS, Codes.DL_PERMISSION_DENIED}:
                 status = self.thread_status[i]
                 print(
                     f"[{self.title}] Aborting, failed to download \n{self.data_links[i]}")
                 break
+
+        if permission_denied:
+            print('dl permission denied, exiting')
+            if self.status_obs is not None:
+                self.status_obs.process_stopped()
+            return
 
         t_end = time.time()
 
