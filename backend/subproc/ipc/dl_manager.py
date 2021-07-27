@@ -6,7 +6,7 @@ from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserve
 from backend.subproc.ipc.message import DlData, Message, Messenger
 from collections import deque
 import multiprocessing as mp
-from backend.subproc.yt_dl import YTDownloader
+from backend.subproc.yt_dl import Resumer, YTDownloader
 from backend.subproc.ipc.piped_status_observer import PipedStatusObserver
 from backend.controller.gui.app_closed_observer import AppClosedObserver
 
@@ -44,6 +44,7 @@ class DlManager(AppClosedObserver):
         self.total_tasks_started = 0
 
         self.handlers = {
+            DlCodes.PROCESS_STARTED: self._on_process_started,
             DlCodes.DL_STARTED: self._on_dl_started,
             DlCodes.CAN_PROCEED_DL: self._on_can_proceed_dl,
             DlCodes.CHUNK_FETCHED: self._on_chunk_fetched,
@@ -51,7 +52,8 @@ class DlManager(AppClosedObserver):
             DlCodes.MERGE_STARTED: self._on_merge_started,
             DlCodes.MERGE_FINISHED: self._on_merge_finished,
             DlCodes.PROCESS_FINISHED: self._on_process_finished,
-            DlCodes.PROCESS_STOPPED: self._on_process_stopped
+            DlCodes.PROCESS_STOPPED: self._on_process_stopped,
+            DlCodes.DL_ERROR: self._on_dl_error,
         }
 
         self.id_gen = self._create_task_id_gen()
@@ -87,7 +89,8 @@ class DlManager(AppClosedObserver):
         self.connections[s_task.task_id] = my_con
 
         proc = mp.Process(target=self._run_downloader, args=(
-            path, url, dlink1, dlink2, child_con, s_task.task_id))
+            path, url, dlink1, dlink2, child_con,
+            s_task.task_id, task.is_resumed(), task.get_resumer()))
         proc.start()
 
         self.running_tasks.add(s_task)
@@ -100,11 +103,17 @@ class DlManager(AppClosedObserver):
         for obs in self.subproc_obss:
             obs.on_subproc_created(proc, my_con)
 
-    def _on_dl_started(self, dl_data: DlData):
-        link_id = dl_data.data
+    def _on_process_started(self, dl_data: DlData):
+        tmp_files_dir = dl_data.data
         task = self._get_task(dl_data)
 
-        task.dl_started(link_id)
+        task.process_started(tmp_files_dir)
+
+    def _on_dl_started(self, dl_data: DlData):
+        link_id, abs_path = dl_data.data
+        task = self._get_task(dl_data)
+
+        task.dl_started(link_id, abs_path)
 
     def _on_can_proceed_dl(self, dl_data: DlData):
         link_id = dl_data.data
@@ -118,14 +127,19 @@ class DlManager(AppClosedObserver):
         self.msger.send(conn, resp_msg)
 
     def _on_chunk_fetched(self, dl_data: DlData):
-        link_id, bytes_fetched = dl_data.data
+        link_id, bytes_fetched, chunk_url = dl_data.data
         task = self._get_task(dl_data)
-        task.chunk_fetched(link_id, bytes_fetched)
+        task.chunk_fetched(link_id, bytes_fetched, chunk_url)
 
     def _on_dl_fisnished(self, dl_data: DlData):
         link_id = dl_data.data
         task = self._get_task(dl_data)
         task.dl_finished(link_id)
+
+    def _on_dl_error(self, dl_data: DlData):
+        link_id, exc_type, exc_msg = dl_data.data
+        task = self._get_task(dl_data)
+        task.dl_error_occured(link_id, exc_type, exc_msg)
 
     def _on_merge_started(self, dl_data: DlData):
         self._get_task(dl_data).merge_started()
@@ -177,10 +191,11 @@ class DlManager(AppClosedObserver):
         self.subproc_obss.append(obs)
 
     def _run_downloader(self, path: str, url: str, dlink1: str, dlink2: str,
-                        conn: Connection, task_id: int):
+                        conn: Connection, task_id: int, is_resumed: bool, resumer: Resumer):
         stat_obs = PipedStatusObserver(conn, task_id, Messenger())
         downloader = YTDownloader(
-            path, url, [dlink1, dlink2], stat_obs, cleanup=True)
+            path, url, [dlink1, dlink2], stat_obs, cleanup=True, verbose=False,
+            resumed=is_resumed, resumer=resumer)
         downloader.download()
 
     def _create_task_id_gen(self) -> Generator[int, None, None]:

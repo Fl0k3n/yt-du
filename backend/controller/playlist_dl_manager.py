@@ -4,7 +4,11 @@ from backend.model.db_models import DataLink, PlaylistLink
 
 class PlaylistDlManager(ABC):
     @abstractmethod
-    def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink):
+    def on_process_started(self, playlist_link: PlaylistLink, tmp_files_dir: str):
+        pass
+
+    @abstractmethod
+    def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink, abs_path: str):
         pass
 
     @abstractmethod
@@ -13,7 +17,7 @@ class PlaylistDlManager(ABC):
 
     @abstractmethod
     def on_dl_progress(self, playlist_link: PlaylistLink,
-                       data_link: DataLink, bytes_fetched: int):
+                       data_link: DataLink, bytes_fetched: int, chunk_url: str):
         pass
 
     # single data link

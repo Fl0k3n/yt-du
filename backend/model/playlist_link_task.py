@@ -12,18 +12,21 @@ class PlaylistLinkTask(DlTask):
         self.playlist_link = playlist_link
         self.finished_dls = 0
 
-    def dl_started(self, link_idx: int):
+    def process_started(self, tmp_files_dir: str):
+        self.pl_dl_mgr.on_process_started(self.playlist_link, tmp_files_dir)
+
+    def dl_started(self, link_idx: int, abs_path: str):
         data_link = self.data_links[link_idx]
-        self.pl_dl_mgr.on_dl_started(self.playlist_link, data_link)
+        self.pl_dl_mgr.on_dl_started(self.playlist_link, data_link, abs_path)
 
     def dl_permission_requested(self, link_idx: int) -> bool:
         data_link = self.data_links[link_idx]
         return self.pl_dl_mgr.can_proceed_dl(self.playlist_link, data_link)
 
-    def chunk_fetched(self, link_idx: int, bytes_fetched: int):
+    def chunk_fetched(self, link_idx: int, bytes_fetched: int, chunk_url: str):
         data_link = self.data_links[link_idx]
         self.pl_dl_mgr.on_dl_progress(
-            self.playlist_link, data_link, bytes_fetched)
+            self.playlist_link, data_link, bytes_fetched, chunk_url)
 
     def dl_finished(self, link_idx: int):
         data_link = self.data_links[link_idx]
@@ -44,3 +47,22 @@ class PlaylistLinkTask(DlTask):
 
     def process_stopped(self):
         self.pl_dl_mgr.on_process_paused(self.playlist_link)
+
+    def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
+        # TODO
+        data_link = self.data_links[link_idx]
+        print(
+            f'[DL ERROR] for {data_link.link.title} | mime {data_link.mime} | exc_type {exc_type}')
+
+    def get_media_urls(self) -> List[str]:
+        if not self.resumed:
+            return super().get_media_urls()
+
+        m_urls = []
+        for dlink in self.data_links:
+            url = dlink.url
+            if dlink.last_chunk_url is not None:
+                url = dlink.last_chunk_url
+            m_urls.append(url)
+
+        return m_urls

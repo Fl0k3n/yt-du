@@ -34,7 +34,7 @@ class DBHandler(AppClosedObserver):
         if url is not None:
             q = q.filter(Playlist.url == url)
 
-        return q.one_or_none()
+        return q.first()
 
     def get_playlists(self, offset: int, limit: int) -> List[Playlist]:
         return (self.session

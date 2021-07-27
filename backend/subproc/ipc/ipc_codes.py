@@ -21,21 +21,25 @@ class ExtCodes(Enum):
 class DlCodes(Enum):
     """Codes used for IPC with yt_dl worker"""
     TERMINATE = 0
+    # data: str = absolute path of tmp files dir
+    PROCESS_STARTED = 1
+    # data: tupe(int, str) = (index of data link, absolute path)
+    DL_STARTED = 2
     # data: int = index of data link
-    DL_STARTED = 1
-    # data: int = index of data link
-    CAN_PROCEED_DL = 2
+    CAN_PROCEED_DL = 3
     # data: bool = whether dl can be proceeded
-    DL_PERMISSION = 3
-    # data: tuple(int, int) = (index of data link, bytes dl'ed)
-    CHUNK_FETCHED = 4
+    DL_PERMISSION = 4
+    # data: tuple(int, int, str) = (index of data link, bytes dl'ed, chunk_url)
+    CHUNK_FETCHED = 5
     # data: int = index of data link
-    DL_FINISHED = 5
+    DL_FINISHED = 6
     #data: None
-    MERGE_STARTED = 6
+    MERGE_STARTED = 7
     # data: tuple(int, str) = (ffmpeg exit code, stderr)
-    MERGE_FINISHED = 7
+    MERGE_FINISHED = 8
     # data: bool = whether process was successful
-    PROCESS_FINISHED = 8
+    PROCESS_FINISHED = 9
     # data: None
-    PROCESS_STOPPED = 9
+    PROCESS_STOPPED = 10
+    # data: tuple(int, str, str) = (index of dat link, type of exception, exception msg)
+    DL_ERROR = 11

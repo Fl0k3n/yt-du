@@ -7,6 +7,7 @@ Then download method should be called.
 Downloader downloads passed media links in separate threads, then merges them
 using ffmpeg subprocess, stderr of ffmpeg can be obtained.
 """
+from backend.subproc.ipc.ipc_codes import DlCodes
 import sys
 import re
 import os
@@ -45,7 +46,11 @@ class StatusObserver(ABC):
     """All download, exit, subproc creation methods have to be thread safe"""
 
     @abstractmethod
-    def dl_started(self, idx: int):
+    def process_started(self, tmp_files_dir_path: str):
+        pass
+
+    @abstractmethod
+    def dl_started(self, idx: int, abs_path: str):
         pass
 
     @abstractmethod
@@ -53,7 +58,7 @@ class StatusObserver(ABC):
         pass
 
     @abstractmethod
-    def chunk_fetched(self, idx: int, bytes_len: int):
+    def chunk_fetched(self, idx: int, bytes_len: int, chunk_url: str):
         pass
 
     @abstractmethod
@@ -117,6 +122,31 @@ class StatusObserver(ABC):
         pass
 
 
+class Resumer(ABC):
+    @abstractmethod
+    def should_create_tmp_files_dir(self) -> bool:
+        pass
+
+    @abstractmethod
+    def get_tmp_files_dir_path(self) -> Path:
+        """If it shouldn't be created, this method should provide absolute path to this dir"""
+        pass
+
+    @abstractmethod
+    def should_create_tmp_files(self) -> bool:
+        pass
+
+    @abstractmethod
+    def get_tmp_file_names(self) -> List[Path]:
+        """If it shouldn't be created, this method should provide absolute paths to media url files
+           order MUST correspond to order of media urls"""
+        pass
+
+    @abstractmethod
+    def should_resume_download(self) -> bool:
+        pass
+
+
 class UnsupportedURLError(Exception):
     """Raised when url couldn't have been parsed for downloading"""
 
@@ -134,8 +164,17 @@ class UnsupportedURLError(Exception):
 
 class MediaURL(ABC):
     """If getting parameter requires extra work lazy init will be used"""
+
+    def __init__(self, url: str, resumed: bool = False):
+        self.url = url
+        self.resumed = resumed
+
     @abstractmethod
     def get_size(self) -> int:
+        pass
+
+    @abstractmethod
+    def set_size(self, size: int):
         pass
 
     @abstractmethod
@@ -169,12 +208,12 @@ class ClenMediaURL(MediaURL):
     - expire, clen, mime, range
     """
 
-    # bytes, yt throttles chunks > 10MB with this format
-    _MAX_CHUNK_SIZE = 10 * 1024 * 1024 - 1
+    # bytes, yt throttles chunks > 10MB (MB instead of MiB for safety) with this format
+    _MAX_CHUNK_SIZE = 10 * 1000 * 1000 - 1
     _REQ_PARAMS = ['clen', 'mime', 'expire', 'range']
 
-    def __init__(self, url: str):
-        self.url = url
+    def __init__(self, url: str, resumed: bool = False):
+        super().__init__(url=url, resumed=resumed)
         query = parse.urlparse(self.url).query
         params = parse.parse_qs(query)
         try:
@@ -197,15 +236,34 @@ class ClenMediaURL(MediaURL):
     def get_size(self) -> int:
         return self.size
 
+    def set_size(self, size: int):
+        self.size = size
+
     def generate_chunk_urls(self) -> Generator[Tuple[str, int], None, None]:
         clen = self.get_size()
-        range_start = 0
-        range_end = self._MAX_CHUNK_SIZE - 1
         link = self.get_raw_url()
 
         range_re = re.compile(r'(?<=(?:\?|&)range=)(\d+-\d+)')
-        if not range_re.search(link):
-            raise UnsupportedURLError(link, 'range')
+
+        try:
+            base_r_start, base_r_end = [
+                int(x) for x in range_re.search(link).group(1).split('-')]
+        except Exception as e:
+            raise UnsupportedURLError(link, 'range', str(e))
+
+        if base_r_start == 0:
+            range_start = 0
+            range_end = self._MAX_CHUNK_SIZE - 1
+        else:
+            range_start = base_r_end + 1
+            range_end = base_r_end + self._MAX_CHUNK_SIZE
+            if not self.resumed:
+                raise AttributeError(
+                    'first chunk url starting at unexpected position ', self.get_raw_url())
+
+        # already finished
+        if self.resumed and base_r_end == clen - 1:
+            return
 
         end_found = False
 
@@ -236,8 +294,8 @@ class SegmentedMediaURL(MediaURL):
     _MAX_SIZE_FETCHING_THREADS = 10
 
     def __init__(self, url: str, size: int = None,
-                 fetch_retries: int = 5, retry_timeout: int = 0.5):
-        self.url = url
+                 fetch_retries: int = 5, retry_timeout: int = 0.5, resumed: bool = False):
+        super().__init__(url=url, resumed=resumed)
         self.size = size
         self.fetch_retries = fetch_retries
         self.retry_timeout = retry_timeout
@@ -278,8 +336,14 @@ class SegmentedMediaURL(MediaURL):
 
     def _get_seg_count(self) -> int:
         if self.seg_count is None:
+            if self.resumed:
+                first_link = re.sub(r'(?<=\?|&)(sq=(\d+))',
+                                    'sq=0', self.get_raw_url())
+            else:
+                first_link = self.get_raw_url()
+
             resp = self._try_request(requests.get,
-                                     self.url, timeout=self.retry_timeout)
+                                     first_link, timeout=self.retry_timeout)
             seg_re = r'Segment-Count: (\d+)'
             self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
 
@@ -287,12 +351,29 @@ class SegmentedMediaURL(MediaURL):
 
     def _generate_chunk_urls(self) -> Generator[str, None, None]:
         seg_re = r'(?<=\?|&)(sq=(\d+))'
-        matches = re.search(seg_re, self.url)
 
-        url_pref = self.url[:matches.start(1)]
-        url_suff = self.url[matches.end(1):]
+        try:
+            matches = re.search(seg_re, self.get_raw_url())
 
-        for i in range(self._get_seg_count()):
+            url_pref = self.url[:matches.start(1)]
+            url_suff = self.url[matches.end(1):]
+
+            last_seg = int(matches.group(2))
+        except Exception as e:
+            raise UnsupportedURLError(self.get_raw_url(), 'sq', str(e))
+
+        if last_seg > 0 and not self.resumed:
+            raise AttributeError(
+                'first chunk url starting at unexpected position ', self.get_raw_url())
+
+        if last_seg == 0 and not self.resumed:
+            last_seg = -1
+
+        # already finished
+        if self.resumed and last_seg == self._get_seg_count():
+            return
+
+        for i in range(last_seg + 1, self._get_seg_count()):
             yield f'{url_pref}sq={i}{url_suff}'
 
     def _fetch_content_len(self):
@@ -334,6 +415,9 @@ class SegmentedMediaURL(MediaURL):
 
         return self.size
 
+    def set_size(self, size: int):
+        self.size = size
+
     def generate_chunk_urls(self) -> Generator[Tuple[str, int], None, None]:
         yield from zip(self._generate_chunk_urls(), self._get_seg_sizes())
 
@@ -343,14 +427,14 @@ class SegmentedMediaURL(MediaURL):
 
 
 # factory method
-def create_media_url(url: str) -> MediaURL:
+def create_media_url(url: str, resumed: bool = False) -> MediaURL:
     classes = [ClenMediaURL, SegmentedMediaURL]
     query = parse.urlparse(url).query
     params = parse.parse_qs(query)
 
     for cls in classes:
         if all(param in params for param in cls.get_required_params()):
-            return cls(url)
+            return cls(url, resumed=resumed)
 
     raise UnsupportedURLError(url, msg="Failed to create MediaURL subclass")
 
@@ -407,8 +491,6 @@ class Codes(Enum):
 
 
 class YTDownloader:
-    # bytes, yt throttles chunks > 10MB (probably)
-    _MAX_CHUNK_SIZE = 10 * 1024 * 1024 - 1
     try:
         from backend.utils.assets_loader import AssetsLoader as AL
         TMP_DIR = Path(AL.get_env('TMP_FILES_PATH'))
@@ -416,7 +498,7 @@ class YTDownloader:
         TMP_DIR = PARENT_DIR.joinpath('.tmp')
 
     def __init__(self, path: str, link: str, data_links: List[str], status_obs: StatusObserver = None,
-                 title='unnamed', retry_timeout=5, retries=25, verbose=True, cleanup=True):
+                 title='unnamed', retry_timeout=5, retries=25, resumed=False, resumer: Resumer = None, verbose=True, cleanup=True):
         """
         Args:
             path (string): absolute path to file where downloaded video should be saved
@@ -436,7 +518,12 @@ class YTDownloader:
         self.retries = retries
         self.verbose = verbose
         self.cleanup = cleanup
+        self.resumed = resumed
+        self.resumer = resumer
         self.status_obs = status_obs
+
+        if self.resumed and resumer is None:
+            raise AttributeError('Resumer is required for resume mode')
 
         if self.status_obs is not None:
             self.status_obs.allow_exit()
@@ -449,10 +536,13 @@ class YTDownloader:
 
         self._init_thread_pool()
 
+        if self.status_obs is not None:
+            self.status_obs.process_started(str(self.tmp_files_dir.absolute()))
+
     def _create_media_urls(self):
         try:
             self.media_urls = [create_media_url(
-                url) for url in self.data_links]
+                url, self.resumed) for url in self.data_links]
         except UnsupportedURLError as e:
             print(e)
             if self.status_obs is not None:
@@ -461,6 +551,10 @@ class YTDownloader:
             exit(1)
 
     def _create_tmp_files_dir(self):
+        if self.resumed and not self.resumer.should_create_tmp_files_dir():
+            self.tmp_files_dir = self.resumer.get_tmp_files_dir_path()
+            return
+
         try:
             os.mkdir(self.TMP_DIR)
         except FileExistsError:
@@ -475,6 +569,10 @@ class YTDownloader:
             pass
 
     def _create_tmp_file_names(self):
+        if self.resumed and not self.resumer.should_create_tmp_files():
+            self.file_names = self.resumer.get_tmp_file_names()
+            return
+
         self.file_names = []
         for i, link in enumerate(self.media_urls):
             mime = link.get_mime()
@@ -483,6 +581,9 @@ class YTDownloader:
                 self.tmp_files_dir, f'{i}.{ext}'))
 
     def _init_thread_pool(self):
+        if self.resumed and not self.resumer.should_resume_download():
+            return
+
         self.thread_status = [Codes.UNDEFINED] * len(self.data_links)
 
         self.threads = [threading.Thread(target=self._fetch, args=(link, media_url, file_name, i))
@@ -490,16 +591,23 @@ class YTDownloader:
             zip(self.data_links, self.media_urls, self.file_names))]
 
     def _fetch(self, link, media_url, out_file_path, idx):
-        """fetches data links in _MAX_CHUNK sizes then merges them"""
+        """fetches data links in chunks"""
         if self.status_obs is not None:
-            self.status_obs.dl_started(idx)
+            self.status_obs.dl_started(idx, str(out_file_path))
+
+        print('DL MSG SENT')
 
         if self.verbose:
             print(f"[{self.title}] Fetching: {link[:150]}...")
 
         tmp_file_path = f'{out_file_path}_{idx}'
 
-        with open(out_file_path, 'wb') as f:
+        if self.resumed and self.resumer.should_resume_download():
+            f_mode = 'ab'
+        else:
+            f_mode = 'wb'
+
+        with open(out_file_path, f_mode) as f:
             for i, (chunk_link, chunk_size) in enumerate(media_url.generate_chunk_urls()):
                 retried = 0
                 while True:
@@ -532,7 +640,8 @@ class YTDownloader:
                         f.flush()
 
                         if self.status_obs is not None:
-                            self.status_obs.chunk_fetched(idx, chunk_size)
+                            self.status_obs.chunk_fetched(
+                                idx, chunk_size, chunk_link)
                             self.status_obs.allow_exit()
 
                         break
@@ -574,7 +683,7 @@ class YTDownloader:
 
         if self.status_obs is not None:
             self.status_obs.allow_subproc_start()
-            
+
         pid = os.fork()
         if pid == 0:
             os.close(IN_ME)
@@ -629,7 +738,37 @@ class YTDownloader:
 
     def download(self):
         """returns True iff downloaded succesfully and ffmpeg stderr log"""
+        if not self.resumed or \
+                (self.resumed and self.resumer.should_resume_download()):
+            status = self._fetch_all()
 
+            if status == Codes.DL_PERMISSION_DENIED:
+                return 0, 'DL PERMISSION DENIED'
+        else:
+            status = Codes.SUCCESS
+
+        if status == Codes.SUCCESS:
+            status, err_log = self._merge_tmp_files()
+            if self.status_obs is not None:
+                self.status_obs.merge_finished(status, err_log)
+        else:
+            if self.status_obs is not None:
+                self.status_obs.process_finished(False)
+            # TODO
+            return status, 'FAILED AT DL STAGE'
+
+        if status == Codes.SUCCESS and self.verbose:
+            print(f"[{self.title}] OK. Merged successfully.")
+
+        if self.cleanup:
+            self._clean_up()
+
+        if self.status_obs is not None:
+            self.status_obs.process_finished(status == Codes.SUCCESS)
+
+        return status, err_log
+
+    def _fetch_all(self) -> Codes:
         for thread in self.threads:
             # possible race condition if called after
             if self.status_obs is not None:
@@ -667,7 +806,7 @@ class YTDownloader:
             print('dl permission denied, exiting')
             if self.status_obs is not None:
                 self.status_obs.process_stopped()
-            return
+            return Codes.DL_PERMISSION_DENIED
 
         t_end = time.time()
 
@@ -681,26 +820,7 @@ class YTDownloader:
             print(
                 f"[{self.title}] Fetched successfully. SIZE: {size}MB TIME: {t_taken}s")
 
-        if status == Codes.SUCCESS:
-            status, err_log = self._merge_tmp_files()
-            if self.status_obs is not None:
-                self.status_obs.merge_finished(status, err_log)
-        else:
-            if self.status_obs is not None:
-                self.status_obs.process_finished(False)
-            # TODO
-            return status, 'FAILED AT DL STAGE'
-
-        if status == Codes.SUCCESS and self.verbose:
-            print(f"[{self.title}] OK. Merged successfully.")
-
-        if self.cleanup:
-            self._clean_up()
-
-        if self.status_obs is not None:
-            self.status_obs.process_finished(status == Codes.SUCCESS)
-
-        return status, err_log
+        return status
 
 
 def main():

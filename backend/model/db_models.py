@@ -81,6 +81,8 @@ class PlaylistLink(Base, Displayable):
         'playlists.playlist_id'), nullable=False)
     cleaned_up = Column(Boolean, nullable=False, default=False)
     status = Column(Integer, nullable=False, server_default=text('0'))
+    path = Column(Text, nullable=False)
+    tmp_files_dir = Column(Text, nullable=True)
 
     playlist = relationship("Playlist", back_populates="links")
     data_links = relationship('DataLink', back_populates='link')
@@ -132,6 +134,7 @@ class DataLink(Base):
     path = Column(Text, nullable=True)
     downloaded = Column(Integer, nullable=False, default=0)
     download_start_time = Column(TIMESTAMP, nullable=True)
+    last_chunk_url = Column(Text, nullable=True)
 
     link = relationship('PlaylistLink', back_populates='data_links')
     error_logs = relationship('DownloadErrorLog', back_populates='data_link')

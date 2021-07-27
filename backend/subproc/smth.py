@@ -1,3 +1,4 @@
+import urllib.parse as parse
 from queue import Queue, Empty
 import time
 import threading
@@ -58,31 +59,31 @@ import re
 # import multiprocessing
 
 # type 1 urls(clen)
-link = 'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX&index=1'
+# link = 'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX&index=1'
 
-title = 'Śniący!!! Zbudź się!!!'
+# title = 'Śniący!!! Zbudź się!!!'
 
-playlist_name = 'gothic'
+# playlist_name = 'gothic'
 
-path = '/home/flok3n/ytdl/sniacy_zbudz_sie.mp4'
+# path = '/home/flok3n/ytdl/sniacy_zbudz_sie.mp4'
 
-u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627154326&ei=NhP8YNn3KdOHyAXOsIrYBw&ip=185.25.121.191&id=o-AMMfD6Z9P4o1357Fqm6UPE4_R_zpoP7JEZeUbWU9vRZF&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1238750&vprv=1&mime=video%2Fmp4&ns=9SALP-vIXdwiZBOEJ_uenkUG&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1627132601&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=jBitNXlMjyKN2g&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAO7RljeLDY7tdMqcejkMwJrZG4GGv1xDZdikgCTEzSClAiB7QxSKPod0KSssa1wKs32qNVE4yn0P4gCpi_sboblN_w%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAKF5Gdro6NpGWEaKf6eK204xdnEea4T9h0zFQoei_otiAiEAoo5JVjER07S-wh633So3u6ntMFM5vNK8Y4QKuNx3hl4%3D&alr=yes&cpn=CwQkoqaiTCAU8nkA&cver=2.20210721.00.00&range=0-63173&rn=1&rbuf=0'
+# u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627154326&ei=NhP8YNn3KdOHyAXOsIrYBw&ip=185.25.121.191&id=o-AMMfD6Z9P4o1357Fqm6UPE4_R_zpoP7JEZeUbWU9vRZF&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1238750&vprv=1&mime=video%2Fmp4&ns=9SALP-vIXdwiZBOEJ_uenkUG&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1627132601&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=jBitNXlMjyKN2g&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAO7RljeLDY7tdMqcejkMwJrZG4GGv1xDZdikgCTEzSClAiB7QxSKPod0KSssa1wKs32qNVE4yn0P4gCpi_sboblN_w%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAKF5Gdro6NpGWEaKf6eK204xdnEea4T9h0zFQoei_otiAiEAoo5JVjER07S-wh633So3u6ntMFM5vNK8Y4QKuNx3hl4%3D&alr=yes&cpn=CwQkoqaiTCAU8nkA&cver=2.20210721.00.00&range=0-63173&rn=1&rbuf=0'
 
-u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627154326&ei=NhP8YNn3KdOHyAXOsIrYBw&ip=185.25.121.191&id=o-AMMfD6Z9P4o1357Fqm6UPE4_R_zpoP7JEZeUbWU9vRZF&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1238750&vprv=1&mime=audio%2Fwebm&ns=9SALP-vIXdwiZBOEJ_uenkUG&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1627132601&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=jBitNXlMjyKN2g&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRgIhAMD4GAZhVjVtddVSN1fdOoVxGUCHiRuMzLzeudSlWf5AAiEA0pdrVTH_7kYemN-QvFvv0p1OgMsEc7fNEuvgod7N18o%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAKF5Gdro6NpGWEaKf6eK204xdnEea4T9h0zFQoei_otiAiEAoo5JVjER07S-wh633So3u6ntMFM5vNK8Y4QKuNx3hl4%3D&alr=yes&cpn=CwQkoqaiTCAU8nkA&cver=2.20210721.00.00&range=0-65812&rn=2&rbuf=0'
+# u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627154326&ei=NhP8YNn3KdOHyAXOsIrYBw&ip=185.25.121.191&id=o-AMMfD6Z9P4o1357Fqm6UPE4_R_zpoP7JEZeUbWU9vRZF&itag=251&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1238750&vprv=1&mime=audio%2Fwebm&ns=9SALP-vIXdwiZBOEJ_uenkUG&gir=yes&clen=74491&otfp=1&dur=5.401&lmt=1565997728186113&mt=1627132601&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=jBitNXlMjyKN2g&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRgIhAMD4GAZhVjVtddVSN1fdOoVxGUCHiRuMzLzeudSlWf5AAiEA0pdrVTH_7kYemN-QvFvv0p1OgMsEc7fNEuvgod7N18o%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAKF5Gdro6NpGWEaKf6eK204xdnEea4T9h0zFQoei_otiAiEAoo5JVjER07S-wh633So3u6ntMFM5vNK8Y4QKuNx3hl4%3D&alr=yes&cpn=CwQkoqaiTCAU8nkA&cver=2.20210721.00.00&range=0-65812&rn=2&rbuf=0'
 
 
 # type 2 urls(sq)
-# link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
+link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
 
-# title = 'Asap Rocky - Keep It G'
+title = 'Asap Rocky - Keep It G'
 
-# playlist_name = 'live love asap'
+playlist_name = 'live love asap'
 
-# path = '/home/flok3n/ytdl/asap_rocky_keep_it_g.mp4'
+path = '/home/flok3n/ytdl/asap_rocky_keep_it_g.mp4'
 
-# u1 = 'https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627084195&ei=QwH7YJPQBoyBpASBoJPQCA&ip=185.25.121.191&id=o-AMYdcY3wn_KBw4cDpYPszKBjPt3r9kUBhW1VqTNnf3a9&itag=135&aitags=133%2C134%2C135%2C160%2C242%2C243%2C244%2C278&source=yt_otf&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1140000&vprv=1&mime=video%2Fmp4&ns=cfm3ekAXAvuW_amRt5MHIOwG&otf=1&otfp=1&dur=0.000&lmt=1480857666340217&mt=1627062527&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Ck_xblxAIGKUnA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAL9W4asUpfhePOxLAldnzMYiSc_e1XMT7si0eyZ3B7FJAiEAqpBDzEeS--e9tW8u7nxwzaBjB4FS_6DTmqNLF4oBTMA%3D&alr=yes&sig=AOq0QJ8wRQIgIhPyLdVr7UuiJKK4AMR-eUqD8rY0A6PJVI78ncsNRzoCIQDxKVYLGTUY5KRlJp310c3wNXvZ-N1yBGkvl6AYJ4JYbA%3D%3D&cpn=cJwa-gcELhMk1aTv&cver=2.20210721.00.00&sq=0&rn=1&rbuf=0'
+u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627353998&ei=Lh__YIHmJJW5yQXig7PADw&ip=185.25.121.191&id=o-AFTE7GXm3ocXmAr2ju_qIJMszcrRtfsPb2e1xhLpsWMX&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=be&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=998750&vprv=1&mime=video%2Fmp4&ns=klbP8egXLUpNg4KSd4iosrUG&gir=yes&clen=33482744&dur=164.397&lmt=1577918633450418&mt=1627332321&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=Su7JI3Kvk6etAg&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgWkHpfoHYaq3rPRMpfeZcQFrOgsElueFtUF3l2C-7kd0CIQDyltXlKVMMyA6oFDFpra3c7l2e7GjM49lzBUHMmxu9Vg%3D%3D&alr=yes&sig=AOq0QJ8wRQIhAM26abL0VWVdbCqMW3x9T95BlYCfJtYVSt2hm_QiaALnAiBPUlaP6T3OiitoeujItlBtKx0kWYVxrH1eqaLBalMWJg%3D%3D&cpn=Qiu8sWReAE5cl_gu&cver=2.20210721.00.00&range=0-432273&rn=1&rbuf=0'
 
-# u2 = 'https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627084195&ei=QwH7YJPQBoyBpASBoJPQCA&ip=185.25.121.191&id=o-AMYdcY3wn_KBw4cDpYPszKBjPt3r9kUBhW1VqTNnf3a9&itag=251&source=youtube&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1140000&vprv=1&mime=audio%2Fwebm&ns=cfm3ekAXAvuW_amRt5MHIOwG&gir=yes&clen=2899505&otfp=1&dur=182.141&lmt=1563867798213303&mt=1627062527&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Ck_xblxAIGKUnA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgUm1BttH0lEr19PxwdiuEgMFayxeIOIV2Tq9Lt0vj1IICIQCMC7i7O6f9Vi-K-EWr5zqpfLO-yy47CMBU7rKbpGFnuA%3D%3D&alr=yes&sig=AOq0QJ8wRQIgSN6FjSNmANcqFbhdeBHpW51Pg6H7_mLarjKumGhaAFMCIQD1ae2uDMLP-CCDuerMLtmUuPKfrxWhG9qg3gwOK3V9Dw%3D%3D&cpn=cJwa-gcELhMk1aTv&cver=2.20210721.00.00&range=0-66114&rn=2&rbuf=0'
+u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627353998&ei=Lh__YIHmJJW5yQXig7PADw&ip=185.25.121.191&id=o-AFTE7GXm3ocXmAr2ju_qIJMszcrRtfsPb2e1xhLpsWMX&itag=251&source=youtube&requiressl=yes&mh=be&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=998750&vprv=1&mime=audio%2Fwebm&ns=klbP8egXLUpNg4KSd4iosrUG&gir=yes&clen=2698343&dur=164.421&lmt=1577916467292198&mt=1627332321&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=Su7JI3Kvk6etAg&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAIIpVL4t95_3gFRjv_ghf_6Dk_-mg0EBvqqtWkWGKJreAiEA0tacBUxDyhtrPg2j4ywUjyPB0ZAx69iyzoKj_AI4VTA%3D&alr=yes&sig=AOq0QJ8wRQIhAPJG6PqZO-AJYEChvl6JU93ewEsXiGWkKT4IWDWOiNrxAiBcKly0_1GsGXwoay1kUIUhH32kbsCJD6edHjUBUpZq9Q%3D%3D&cpn=Qiu8sWReAE5cl_gu&cver=2.20210721.00.00&range=0-66087&rn=2&rbuf=0'
 
 
 if os.fork() == 0:
@@ -92,10 +93,10 @@ else:
     print(os.wait())
 
 
-# with open('out.mp4', 'wb') as f:
-#     r = requests.get(url, stream=True)
-#     for data in r.raw:
-#         f.write(data)
+# print(requests.get(url, headers={
+#     'Range': 'bytes=0-1'
+# }).headers)
+
 
 # u5 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1625687787&ei=i7LlYJagEsS9yAWmhaXwDg&ip=185.25.121.191&id=o-ABahoSCnCUMXTjOUhY2Oj1rj1UAyB2RVBpR5gntEPdH1&itag=137&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=Ki&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=1430000&vprv=1&mime=video%2Fmp4&ns=BcLoNbmLPf-lB6DF9lQ2iaQG&gir=yes&clen=63174&otfp=1&dur=5.338&lmt=1513571138997598&mt=1625665969&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=UEx7eMPd-aNC9A&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIgYJynsa7JHjPObiTqncly6B-X7RGjzZuf7_Zt_fEN1ZICIQDJI2zu7sgBXl7mq06fUEqGtNRLCbc7fx60YHWpku7KJw%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgRmu-66WneiUVX8-2YjI2JG9yrUQtYNOa8STx4oUrI8oCIQCWCX3XA2ErHDYL5hcF7Eumf48kZVlIiKYY3nj3kxlZEA%3D%3D&alr=yes&cpn=PFG3NZSKz7Z2XvPU&cver=2.20210701.07.00&range=0-63173&rn=1&rbuf=0'
 

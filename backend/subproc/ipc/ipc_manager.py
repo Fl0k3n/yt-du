@@ -48,7 +48,6 @@ class IPCListener(QObject):
             while not self.connections:
                 self.conn_not_empty.wait(self.conn_mutex)
 
-            print('looping')
             tmp = [self.wake_up_r, *self.connections]
             self.conn_mutex.unlock()
             rdy = wait(tmp)

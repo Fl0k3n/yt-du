@@ -32,14 +32,17 @@ class PipedStatusObserver(StatusObserver):
 
         self.listener.start()
 
-    def dl_started(self, idx: int):
-        self._send_dl_msg(DlCodes.DL_STARTED, idx)
+    def process_started(self, tmp_files_dir_path: str):
+        self._send_dl_msg(DlCodes.PROCESS_STARTED, tmp_files_dir_path)
+
+    def dl_started(self, idx: int, abs_path: str):
+        self._send_dl_msg(DlCodes.DL_STARTED, (idx, abs_path))
 
     def dl_finished(self, idx: int):
         self._send_dl_msg(DlCodes.DL_FINISHED, idx)
 
-    def chunk_fetched(self, idx: int, bytes_len: int):
-        self._send_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len))
+    def chunk_fetched(self, idx: int, bytes_len: int, chunk_link: str):
+        self._send_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len, chunk_link))
 
     def can_proceed_dl(self, idx: int) -> bool:
         if self.exiting:
@@ -47,7 +50,6 @@ class PipedStatusObserver(StatusObserver):
 
         self._send_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
 
-        # TODO timeout?
         response = self.msg_queue.get(block=True)
 
         if response.code != DlCodes.DL_PERMISSION:
@@ -77,7 +79,7 @@ class PipedStatusObserver(StatusObserver):
         print('[PIPED] init error')
 
     def dl_error_occured(self, idx: int, exc_type: str, exc_msg: str):
-        print('[PIPED] dl error')
+        self._send_dl_msg(DlCodes.DL_ERROR, (idx, exc_type, exc_msg))
 
     def _create_dl_msg(self, code: DlCodes, data: Any) -> DlData:
         return Message(code, DlData(self.task_id, data))

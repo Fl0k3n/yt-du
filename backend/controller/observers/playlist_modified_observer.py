@@ -55,3 +55,11 @@ class PlaylistModifiedObserver(ABC):
     @abstractmethod
     def playlist_pause_requested(self, playlist: Playlist):
         pass
+
+    @abstractmethod
+    def playlist_link_resume_requested(self, playlist_link: PlaylistLink):
+        pass
+
+    @abstractmethod
+    def playlist_resume_requested(self, playlist: Playlist):
+        pass

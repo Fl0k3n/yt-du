@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from backend.subproc.yt_dl import Resumer
 from backend.model.db_models import DataLink
 from typing import List
 
@@ -9,6 +10,15 @@ class DlTask(ABC):
         self.url = url
         self.data_links = data_links
         self.finished_dls = 0
+        self.resumed = False
+        self.resumer = None
+
+    def resume(self, resumer: Resumer):
+        self.resumed = True
+        self.resumer = resumer
+
+    def is_resumed(self) -> bool:
+        return self.resumed
 
     def get_url(self) -> str:
         return self.url
@@ -19,8 +29,15 @@ class DlTask(ABC):
     def get_media_urls(self) -> List[str]:
         return [link.url for link in self.data_links]
 
+    def get_resumer(self) -> Resumer:
+        return self.resumer
+
     @abstractmethod
-    def dl_started(self, link_idx: int):
+    def process_started(self, tmp_files_dir: str):
+        pass
+
+    @abstractmethod
+    def dl_started(self, link_idx: int, abs_path: str):
         pass
 
     @abstractmethod
@@ -28,7 +45,7 @@ class DlTask(ABC):
         pass
 
     @abstractmethod
-    def chunk_fetched(self, link_idx: int, bytes_fetched: int):
+    def chunk_fetched(self, link_idx: int, bytes_fetched: int, chunk_url: str):
         pass
 
     @abstractmethod
@@ -49,6 +66,10 @@ class DlTask(ABC):
 
     @abstractmethod
     def process_stopped(self):
+        pass
+
+    @abstractmethod
+    def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
         pass
 
     def are_all_downloads_finished(self) -> bool:

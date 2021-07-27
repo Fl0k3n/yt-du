@@ -120,9 +120,11 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
 
     def playlist_dl_started(self, playlist: Playlist):
         self._update_status(playlist)
+        self._set_pausable(playlist, True)
 
     def link_dl_started(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
+        self._set_pausable(playlist_link, True)
 
     def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:
@@ -168,7 +170,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         return CallRcvrCommand(self.playlist_mgr.on_playlist_pause_requested, playlist)
 
     def _get_playlist_resume_cmd(self, playlist: Playlist) -> Command:
-        return CallRcvrCommand(lambda x: print('RESUME REQUESTED'), playlist)
+        return CallRcvrCommand(self.playlist_mgr.on_playlist_resume_requested, playlist)
 
     def _get_link_details_cmd(self, link: PlaylistLink) -> Command:
         # TODO show errs
@@ -178,7 +180,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         return CallRcvrCommand(self.playlist_mgr.on_link_pause_requested, link)
 
     def _get_link_resume_cmd(self, link: PlaylistLink) -> Command:
-        return CallRcvrCommand(lambda x: print('link RESUME REQUESTED'), link)
+        return CallRcvrCommand(self.playlist_mgr.on_link_resume_requested, link)
 
     def on_changed_back(self):
         self.displayed_playlist, self.visible_items = self.displayed_items_stack.pop()
@@ -215,20 +217,34 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         self._update_status(playlist)
         self._set_pausable(playlist, False)
 
+    def playlist_link_resume_requested(self, playlist_link: PlaylistLink):
+        self._set_resumable(playlist_link, False)
+
     def playlist_link_pause_requested(self, playlist_link: PlaylistLink):
         self._set_pausable(playlist_link, False)
 
     def playlist_pause_requested(self, playlist: Playlist):
         self._set_pausable(playlist, False)
 
+    def playlist_resume_requested(self, playlist: Playlist):
+        self._set_resumable(playlist, False)
+
     def playlist_link_paused(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
+        self._set_resumable(playlist_link, True)
 
     def playlist_paused(self, playlist: Playlist):
         self._update_status(playlist)
+        self._set_resumable(playlist, True)
 
     def _set_pausable(self, item: Displayable, pausable: bool):
         try:
             self.displayable_to_view[item].set_pausable(pausable)
+        except KeyError:
+            pass
+
+    def _set_resumable(self, item: Displayable, resumable: bool):
+        try:
+            self.displayable_to_view[item].set_resumable(resumable)
         except KeyError:
             pass
