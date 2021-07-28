@@ -44,10 +44,16 @@ class Playlist(Base, Displayable):
                           pause_command: Command, resume_command: Command,
                           is_pausable: bool, is_resumable: bool,
                           parent: QWidget = None) -> PlaylistListItem:
+        if self.get_status() not in {DataStatus.UNDEFINED, DataStatus.WAIT_FOR_FETCH}:
+            size = self.get_size()
+        else:
+            size = None
+
         return PlaylistListItem(self.name, self.url, self.directory_path, str(self.get_status()),
                                 show_details_command=show_details_command,
                                 pause_command=pause_command, resume_command=resume_command,
-                                is_pausable=is_pausable, is_resumable=is_resumable, parent=parent)
+                                is_pausable=is_pausable, is_resumable=is_resumable, size = size,
+                                parent=parent)
 
     def get_downloaded_bytes(self) -> int:
         return sum(link.get_downloaded_bytes() for link in self.links)

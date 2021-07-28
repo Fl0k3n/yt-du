@@ -1,3 +1,4 @@
+from backend.controller.speedo import Speedo
 import sys
 from typing import List
 from PyQt5.QtWidgets import QApplication
@@ -12,13 +13,15 @@ class App(QApplication):
         super().__init__(argv)
         self.db = DBHandler(verbose=sql_debug)
         self.ipc_manager = IPCManager()
+        self.speedo = Speedo()
 
         self.db.connect()
         self.playlist_manager = PlaylistManager(
-            self.db, self.ipc_manager)
+            self.db, self.ipc_manager, self.speedo)
 
         self.main_window = MainWindowController(self.playlist_manager, self.db)
         self.main_window.add_app_closed_observer(self.ipc_manager)
+        self.main_window.add_app_closed_observer(self.speedo)
 
     def run(self):
         self.main_window.show()

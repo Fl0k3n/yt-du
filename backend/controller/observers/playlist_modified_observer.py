@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from typing import Iterable
 from backend.model.db_models import Playlist, PlaylistLink
 
 
-class PlaylistModifiedObserver(ABC):
+class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
     @abstractmethod
     def playlist_added(self, playlist: Playlist):
         pass

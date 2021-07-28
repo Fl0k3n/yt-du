@@ -30,3 +30,13 @@ class Displayable:
     @abstractmethod
     def set_status(self, status: DataStatus):
         pass
+
+    def get_size(self) -> str:
+        size_bytes = self.get_size_bytes()
+
+        if size_bytes > 1073741824:  # GB
+            size = f'{round(size_bytes / 1073741824 * 100) / 100} GB'
+        else:
+            size = f'{round(size_bytes / 1048576 * 100) / 100} MB'
+        
+        return size

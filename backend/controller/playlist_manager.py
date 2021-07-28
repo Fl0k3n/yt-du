@@ -1,3 +1,5 @@
+from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
+from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
 from backend.model.playlist_link_task import PlaylistLinkTask
 from backend.controller.playlist_dl_manager import PlaylistDlManager
@@ -15,9 +17,10 @@ from collections import defaultdict
 
 
 class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
-    def __init__(self, db: DBHandler, ipc_mgr: IPCManager):
+    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo):
         self.db = db
         self.ipc_mgr = ipc_mgr
+        self.speedo = speedo
 
         self.ipc_mgr.add_playlist_fetched_observer(self)
         self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
@@ -61,6 +64,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
     def add_pl_modified_observer(self, obs: PlaylistModifiedObserver):
         self.pl_modified_observers.append(obs)
+        self.speedo.add_dl_speed_observer(obs)
 
     def add_playlist(self, playlist: Playlist):
         playlist.set_status(DataStatus.WAIT_FOR_FETCH)
@@ -214,12 +218,13 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             self.link_dling_count[link_id] += 1
 
         # wont be called if count drops to 0 then gets resumed
-        if pl_id not in self.pl_dling_count:
-            self.pl_dling_count[pl_id] = 1
-            playlist.set_status(DataStatus.DOWNLOADING)
-            first_link = True
-        else:
-            self.pl_dling_count[pl_id] += 1
+        if first_data_link:
+            if pl_id not in self.pl_dling_count:
+                self.pl_dling_count[pl_id] = 1
+                playlist.set_status(DataStatus.DOWNLOADING)
+                first_link = True
+            else:
+                self.pl_dling_count[pl_id] += 1
 
         data_link.download_start_time = datetime.datetime.now()
         data_link.path = abs_path
@@ -233,6 +238,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         if first_link:
             for obs in self.pl_modified_observers:
                 obs.playlist_dl_started(playlist)
+
+            self.speedo.dl_resumed(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
         return playlist_link not in self.link_pause_requests
@@ -251,6 +258,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         data_link.last_chunk_url = chunk_url
 
         self.db.commit()
+
+        self.speedo.dl_progressed(playlist_link.playlist, bytes_fetched)
 
         for obs in self.pl_modified_observers:
             obs.playlist_dl_progressed(playlist_link.playlist, playlist_link)
@@ -319,6 +328,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
         for obs in self.pl_modified_observers:
             obs.playlist_link_dled(playlist_link)
 
+        if self.pl_dling_count[pl_id] == 0:
+            self.speedo.dl_stopped(playlist_link.playlist)
+
     def on_merge_started(self, playlist_link: PlaylistLink):
         playlist_link.set_status(DataStatus.MERGING)
         self.db.commit()
@@ -375,6 +387,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
             for obs in self.pl_modified_observers:
                 obs.playlist_paused(playlist)
+
+            self.speedo.dl_stopped(playlist)
 
             try:
                 self.pl_pause_requests.remove(playlist)

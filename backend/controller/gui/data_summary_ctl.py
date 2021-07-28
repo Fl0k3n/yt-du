@@ -1,3 +1,4 @@
+from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from backend.controller.gui.view_changed_observer import ViewChangedObserver
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.model.displayable import Displayable
@@ -117,6 +118,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self._show_playlist_details(playlist)
 
         self._set_pausable(playlist, True)
+        self.displayable_to_view[playlist].set_size(playlist.get_size())
 
     def playlist_dl_started(self, playlist: Playlist):
         self._update_status(playlist)
@@ -125,6 +127,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def link_dl_started(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
         self._set_pausable(playlist_link, True)
+
 
     def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:
@@ -246,5 +249,11 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def _set_resumable(self, item: Displayable, resumable: bool):
         try:
             self.displayable_to_view[item].set_resumable(resumable)
+        except KeyError:
+            pass
+
+    def playlist_speed_updated(self, playlist: Playlist, speed_MBps: float):
+        try:
+            self.displayable_to_view[playlist].set_dl_speed(str(speed_MBps))
         except KeyError:
             pass
