@@ -1,13 +1,12 @@
 import asyncio
 import websockets
-from utils.assets_loader import AssetsLoader as AL
+from backend.utils.assets_loader import AssetsLoader as AL
 from collections import deque
 from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
 from multiprocessing.connection import Connection
 import threading
 import signal
-import os
 
 
 class ExtServer:
@@ -91,24 +90,17 @@ class ExtServer:
         while True:
             # TODO keeps process alive, SIGKILL required
             task = await self._get_task()
-            if task.code == ExtCodes.FETCH_PLAYLIST:
-                try:
-                    await ws.send(task.to_json())
-                    resp = await ws.recv()
-
-                    self._on_ext_msg_rcvd(resp, ws)
-
-                    with self.tasks_mutex:
-                        self.tasks.popleft()
-                except websockets.ConnectionClosed:
-                    with self.connection_mutex:
-                        self.connections.remove(ws)
-                        self._send_msg(
-                            Message(ExtCodes.LOST_CONNECTION, len(self.connections)))
-                    return
-            else:
-                print('prrrrrrrrr', task)
-                raise RuntimeError('Unexpected task code')  # TODO
+            try:
+                if task.code in {ExtCodes.FETCH_PLAYLIST, ExtCodes.FETCH_LINK}:
+                    await self._fetch_task(task, ws)
+                else:
+                    raise RuntimeError('Unexpected task code', task)  # TODO
+            except websockets.ConnectionClosed:
+                with self.connection_mutex:
+                    self.connections.remove(ws)
+                    self._send_msg(
+                        Message(ExtCodes.LOST_CONNECTION, len(self.connections)))
+                return
 
     def _on_ext_msg_rcvd(self, json_msg, ws):
         msg = Message.from_json(ExtCodes, json_msg)
@@ -117,6 +109,15 @@ class ExtServer:
     def _send_msg(self, msg: Message):
         with self.msger_mutex:
             self.msger.send(self.owner, msg)
+
+    async def _fetch_task(self, task, ws):
+        await ws.send(task.to_json())
+        resp = await ws.recv()
+
+        self._on_ext_msg_rcvd(resp, ws)
+
+        with self.tasks_mutex:
+            self.tasks.popleft()
 
 
 def run_server(conn):

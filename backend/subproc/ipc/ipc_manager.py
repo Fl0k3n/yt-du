@@ -1,3 +1,4 @@
+from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
 import time
 import threading
 import multiprocessing as mp
@@ -8,7 +9,7 @@ from backend.controller.observers.playlist_fetched_observer import PlaylistFetch
 from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
 from multiprocessing.connection import Connection, wait
 from typing import Dict, List, Set
-from backend.model.db_models import Playlist
+from backend.model.db_models import Playlist, PlaylistLink
 from backend.subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
 from backend.subproc.ipc.ext_manager import ExtManager
@@ -114,6 +115,9 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
     def add_playlist_fetched_observer(self, obs: PlaylistFetchedObserver):
         self.ext_manager.add_playlist_fetched_observer(obs)
 
+    def add_link_fetched_observer(self, obs: LinkFetchedObserver):
+        self.ext_manager.add_link_fetched_observer(obs)
+
     def _on_msg_rcvd(self, msg: Message):
         print(f'MANAGER GOT [{msg.code}]')
         if msg.code in self.ext_codes:
@@ -135,6 +139,12 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
 
     def query_playlist_links(self, playlist: Playlist):
         self.ext_manager.query_playlist_links(playlist)
+
+    def query_link(self, playlist_link: PlaylistLink):
+        self.ext_manager.query_link(playlist_link)
+
+    def query_link_blocking(self, playlist_link: PlaylistLink) -> List[str]:
+        return self.ext_manager.query_link_blocking(playlist_link)
 
     def schedule_dl_task(self, task: DlTask) -> int:
         return self.dl_manager.schedule_task(task)

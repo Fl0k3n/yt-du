@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, TIMESTAMP, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func, text
-from model.displayable import Displayable
+from backend.model.displayable import Displayable
 
 # TODO Rewrite all of them using wrapper classes so polymorphism can be used and
 # playlist manager doesnt look like gowno kurwa jego mac
@@ -52,7 +52,7 @@ class Playlist(Base, Displayable):
         return PlaylistListItem(self.name, self.url, self.directory_path, str(self.get_status()),
                                 show_details_command=show_details_command,
                                 pause_command=pause_command, resume_command=resume_command,
-                                is_pausable=is_pausable, is_resumable=is_resumable, size = size,
+                                is_pausable=is_pausable, is_resumable=is_resumable, size=size,
                                 parent=parent)
 
     def get_downloaded_bytes(self) -> int:

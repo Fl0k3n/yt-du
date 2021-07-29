@@ -31,16 +31,28 @@ class NewPlaylistWindow(QDialog):
         # self.name_input.setText('GOTHIC TEST')
         # self.path_input.setText('/home/flok3n/music')
 
-        # MEDIUM
-        self.url_input.setText(
-            'https://www.youtube.com/watch?v=wMSUZhsmttA&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj')
-        self.name_input.setText('LIVE LOVE ASAP TEST')
-        self.path_input.setText('/home/flok3n/music')
+        # # MEDIUM
+        # self.url_input.setText(
+        #     'https://www.youtube.com/watch?v=wMSUZhsmttA&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj')
+        # self.name_input.setText('LIVE LOVE ASAP TEST')
+        # self.path_input.setText('/home/flok3n/music')
 
         # # LONG
         # self.url_input.setText(
         #     'https://www.youtube.com/watch?v=N_re96JNjxE&list=PL-3XmUCH8wflSD1mcS9VU6g5VtlCTtqOu')
         # self.name_input.setText('GIMPER TEST')
+        # self.path_input.setText('/home/flok3n/music')
+
+        # OWN
+        self.url_input.setText(
+            'https://www.youtube.com/watch?v=8xH0sdjMINY&list=PL-wtbH6CyQQZIkOpf2yWjfp_EL9R52olh&index=1')
+        self.name_input.setText('OWN TEST')
+        self.path_input.setText('/home/flok3n/music')
+
+        # SQ
+        # self.url_input.setText(
+        #     'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PL-wtbH6CyQQbdbbYDwUkQUtMj-M22VQNq&index=1')
+        # self.name_input.setText('SQ TEST')
         # self.path_input.setText('/home/flok3n/music')
 
         btn_box = QWidget()

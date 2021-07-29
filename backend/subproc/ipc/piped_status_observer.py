@@ -1,12 +1,11 @@
-from typing import Any, Set
-from backend.subproc.yt_dl import StatusObserver
+from typing import Any, Dict, Set, Tuple
+from backend.subproc.yt_dl import MediaURL, StatusObserver, UnsupportedURLError, create_media_url
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
 import threading
 from signal import SIGINT
 import os
-from queue import Queue
 
 
 class PipedStatusObserver(StatusObserver):
@@ -25,10 +24,18 @@ class PipedStatusObserver(StatusObserver):
         self.child_pids: Set[int] = set()
         self.children_lock = threading.Lock()
 
-        self.msg_queue = Queue()
+        # link_idx -> permission
+        self.dl_permissions: Dict[int, bool] = {}
+        self.permission_lock = threading.Lock()
+        self.dl_perm_cond = threading.Condition(self.permission_lock)
 
         self.listener = threading.Thread(
             target=self._listen_for_msgs, daemon=True)
+
+        self.renew_links_lock = threading.Lock()
+        self.links_renewed_cond = threading.Condition(self.renew_links_lock)
+        # link_idx -> (renewed MediaUrl, is_consistent)
+        self.renewed_links: Dict[int, Tuple[MediaURL, bool]] = {}
 
         self.listener.start()
 
@@ -50,14 +57,10 @@ class PipedStatusObserver(StatusObserver):
 
         self._send_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
 
-        response = self.msg_queue.get(block=True)
-
-        if response.code != DlCodes.DL_PERMISSION:
-            # TODO send another msg ?
-            print('in can proceed recvd unexpected msg', response)
-            exit(1)
-
-        return response.data
+        with self.permission_lock:
+            while idx not in self.dl_permissions:
+                self.dl_perm_cond.wait()
+            return self.dl_permissions.pop(idx)
 
     def process_stopped(self):
         msg = self._create_dl_msg(DlCodes.PROCESS_STOPPED, None)
@@ -102,8 +105,18 @@ class PipedStatusObserver(StatusObserver):
                     for pid in self.child_pids:
                         os.kill(pid, SIGINT)
                     os._exit(0)  # TODO maybe use another exit method
+            elif msg.code == DlCodes.DL_PERMISSION:
+                with self.permission_lock:
+                    link_idx, perm = msg.data
+                    self.dl_permissions[link_idx] = perm
+                    self.dl_perm_cond.notify_all()
+            elif msg.code == DlCodes.URL_RENEWED:
+                with self.renew_links_lock:
+                    idx, media_url, is_consistent = msg.data
+                    self.renewed_links[idx] = (media_url, is_consistent)
+                    self.links_renewed_cond.notify_all()
             else:
-                self.msg_queue.put(msg)
+                print('rcvd unexpected msg:', msg)
 
     def thread_started(self):
         self.thread_count += 1
@@ -133,3 +146,15 @@ class PipedStatusObserver(StatusObserver):
     def subprocess_finished(self, pid: int):
         with self.children_lock:
             self.child_pids.remove(pid)
+
+    def renew_link(self, idx: int, media_url: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
+        self._send_dl_msg(DlCodes.URL_EXPIRED,
+                          (idx, media_url, last_successful))
+
+        with self.renew_links_lock:
+            while idx not in self.renewed_links:
+                self.links_renewed_cond.wait()
+
+            renewed, is_consistent = self.renewed_links.pop(idx)
+
+            return renewed, is_consistent

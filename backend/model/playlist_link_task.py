@@ -1,5 +1,7 @@
+import threading
+from backend.subproc.yt_dl import MediaURL, UnsupportedURLError
 from backend.controller.playlist_dl_manager import PlaylistDlManager
-from typing import List
+from typing import Dict, List, Tuple
 from backend.model.dl_task import DlTask
 from backend.model.db_models import DataLink, PlaylistLink
 
@@ -11,6 +13,8 @@ class PlaylistLinkTask(DlTask):
         self.pl_dl_mgr = pl_dl_mgr
         self.playlist_link = playlist_link
         self.finished_dls = 0
+        self.renewed_links: Dict[int, MediaURL] = {}
+        self.renew_links_lock = threading.Lock()
 
     def process_started(self, tmp_files_dir: str):
         self.pl_dl_mgr.on_process_started(self.playlist_link, tmp_files_dir)
@@ -47,6 +51,22 @@ class PlaylistLinkTask(DlTask):
 
     def process_stopped(self):
         self.pl_dl_mgr.on_process_paused(self.playlist_link)
+
+    def renew_link(self, link_idx: int, media_url: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
+        mime = media_url.get_mime()
+        with self.renew_links_lock:
+            if mime in self.renewed_links:
+                renewed = self.renewed_links.pop(mime)
+            else:
+                for link in self.pl_dl_mgr.get_renewed_links(self.playlist_link):
+                    r_mime = link.get_mime()
+                    if r_mime == mime:
+                        renewed = link
+                    else:
+                        self.renewed_links[r_mime] = link
+
+            return self.pl_dl_mgr.renew_link(self.playlist_link, self.data_links[link_idx],
+                                             media_url, renewed, last_successful)
 
     def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
         # TODO

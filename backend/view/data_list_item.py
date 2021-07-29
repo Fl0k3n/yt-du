@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt
 from backend.utils.commands.command import CallRcvrCommand, Command
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QAction, QApplication, QFrame, QGridLayout, QMenu, QProgressBar, QWidget
-from view.scrollable_label import ScrollableLabel
+from backend.view.scrollable_label import ScrollableLabel
 
 
 class DataListItem(QFrame):

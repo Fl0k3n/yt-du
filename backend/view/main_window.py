@@ -1,9 +1,9 @@
 from PyQt5 import QtCore, QtGui
 from backend.utils.commands.command import Command
-from PyQt5.QtWidgets import QDialog, QHBoxLayout, QVBoxLayout, QWidget
-from view.options_box import OptionsBox
-from view.data_summary_box import DataSummaryBox
-from controller.gui.view_changer import DataViewChanger
+from PyQt5.QtWidgets import QDialog, QHBoxLayout, QWidget
+from backend.view.options_box import OptionsBox
+from backend.view.data_summary_box import DataSummaryBox
+from backend.controller.gui.view_changer import DataViewChanger
 
 
 class MainWindow(QDialog):

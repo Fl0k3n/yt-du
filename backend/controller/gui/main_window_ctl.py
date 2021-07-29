@@ -8,7 +8,7 @@ from backend.controller.playlist_manager import PlaylistManager
 from backend.controller.db_handler import DBHandler
 from backend.view.main_window import MainWindow
 from backend.controller.gui.data_summary_ctl import DataSummaryController
-from controller.gui.view_changer import DataViewChanger
+from backend.controller.gui.view_changer import DataViewChanger
 
 
 class MainWindowController(DataViewChanger):

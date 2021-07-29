@@ -1,3 +1,4 @@
+from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
 from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
@@ -5,24 +6,25 @@ from backend.model.playlist_link_task import PlaylistLinkTask
 from backend.controller.playlist_dl_manager import PlaylistDlManager
 from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
-from typing import Dict, Iterable, List, Set
+from typing import Dict, Iterable, List, Set, Tuple
 from backend.controller.db_handler import DBHandler
 from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
-from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
+from backend.subproc.yt_dl import MediaURL, create_media_url, UnsupportedURLError
 import datetime
 from collections import defaultdict
 
 
-class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
+class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlManager):
     def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo):
         self.db = db
         self.ipc_mgr = ipc_mgr
         self.speedo = speedo
 
         self.ipc_mgr.add_playlist_fetched_observer(self)
+        self.ipc_mgr.add_link_fetched_observer(self)
         self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
         # playlist_url -> idx in list above
         self.pl_url_map: Dict[str, int] = {}
@@ -239,6 +241,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
             for obs in self.pl_modified_observers:
                 obs.playlist_dl_started(playlist)
 
+        if first_link or self.pl_dling_count[pl_id] == 1:
             self.speedo.dl_resumed(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
@@ -495,3 +498,23 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
 
         for obs in self.pl_modified_observers:
             obs.playlist_link_resume_requested(playlist_link)
+
+    def get_renewed_links(self, playlist_link: PlaylistLink) -> List[MediaURL]:
+        data_links = self.ipc_mgr.query_link_blocking(playlist_link)
+        # will raise UnsupportedURLError on failure
+        return [create_media_url(link, resumed=False) for link in data_links]
+
+    def on_link_fetched(self, original_link: PlaylistLink, data_links: Iterable[str]):
+        pass
+
+    def renew_link(self, playlist_link: PlaylistLink, data_link: DataLink, old: MediaURL,
+                   renewed: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
+        # TODO update database entry of data_link (this is called from separate thread)
+        if type(renewed) == type(old):
+            try:
+                old.renew(renewed, last_successful)
+                return old, True
+            except UnsupportedURLError as e:
+                print('Failed to renew url', e)
+
+        return renewed, False

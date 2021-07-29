@@ -73,24 +73,33 @@ import re
 
 
 # type 2 urls(sq)
-link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
+# link = 'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj&index=9'
 
-title = 'Asap Rocky - Keep It G'
+# title = 'Asap Rocky - Keep It G'
 
-playlist_name = 'live love asap'
+# playlist_name = 'live love asap'
 
-path = '/home/flok3n/ytdl/asap_rocky_keep_it_g.mp4'
+# path = '/home/flok3n/ytdl/asap_rocky_keep_it_g.mp4'
 
-u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627353998&ei=Lh__YIHmJJW5yQXig7PADw&ip=185.25.121.191&id=o-AFTE7GXm3ocXmAr2ju_qIJMszcrRtfsPb2e1xhLpsWMX&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=be&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=998750&vprv=1&mime=video%2Fmp4&ns=klbP8egXLUpNg4KSd4iosrUG&gir=yes&clen=33482744&dur=164.397&lmt=1577918633450418&mt=1627332321&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=Su7JI3Kvk6etAg&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgWkHpfoHYaq3rPRMpfeZcQFrOgsElueFtUF3l2C-7kd0CIQDyltXlKVMMyA6oFDFpra3c7l2e7GjM49lzBUHMmxu9Vg%3D%3D&alr=yes&sig=AOq0QJ8wRQIhAM26abL0VWVdbCqMW3x9T95BlYCfJtYVSt2hm_QiaALnAiBPUlaP6T3OiitoeujItlBtKx0kWYVxrH1eqaLBalMWJg%3D%3D&cpn=Qiu8sWReAE5cl_gu&cver=2.20210721.00.00&range=0-432273&rn=1&rbuf=0'
+# u1 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627353998&ei=Lh__YIHmJJW5yQXig7PADw&ip=185.25.121.191&id=o-AFTE7GXm3ocXmAr2ju_qIJMszcrRtfsPb2e1xhLpsWMX&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278%2C394%2C395%2C396%2C397%2C398%2C399&source=youtube&requiressl=yes&mh=be&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=998750&vprv=1&mime=video%2Fmp4&ns=klbP8egXLUpNg4KSd4iosrUG&gir=yes&clen=33482744&dur=164.397&lmt=1577918633450418&mt=1627332321&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=Su7JI3Kvk6etAg&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIgWkHpfoHYaq3rPRMpfeZcQFrOgsElueFtUF3l2C-7kd0CIQDyltXlKVMMyA6oFDFpra3c7l2e7GjM49lzBUHMmxu9Vg%3D%3D&alr=yes&sig=AOq0QJ8wRQIhAM26abL0VWVdbCqMW3x9T95BlYCfJtYVSt2hm_QiaALnAiBPUlaP6T3OiitoeujItlBtKx0kWYVxrH1eqaLBalMWJg%3D%3D&cpn=Qiu8sWReAE5cl_gu&cver=2.20210721.00.00&range=0-432273&rn=1&rbuf=0'
 
 u2 = 'https://r3---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627353998&ei=Lh__YIHmJJW5yQXig7PADw&ip=185.25.121.191&id=o-AFTE7GXm3ocXmAr2ju_qIJMszcrRtfsPb2e1xhLpsWMX&itag=251&source=youtube&requiressl=yes&mh=be&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=3&pl=24&initcwndbps=998750&vprv=1&mime=audio%2Fwebm&ns=klbP8egXLUpNg4KSd4iosrUG&gir=yes&clen=2698343&dur=164.421&lmt=1577916467292198&mt=1627332321&fvip=3&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=Su7JI3Kvk6etAg&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRgIhAIIpVL4t95_3gFRjv_ghf_6Dk_-mg0EBvqqtWkWGKJreAiEA0tacBUxDyhtrPg2j4ywUjyPB0ZAx69iyzoKj_AI4VTA%3D&alr=yes&sig=AOq0QJ8wRQIhAPJG6PqZO-AJYEChvl6JU93ewEsXiGWkKT4IWDWOiNrxAiBcKly0_1GsGXwoay1kUIUhH32kbsCJD6edHjUBUpZq9Q%3D%3D&cpn=Qiu8sWReAE5cl_gu&cver=2.20210721.00.00&range=0-66087&rn=2&rbuf=0'
 
+kwds = ['range', 'rn', 'rbuf']
+nvals = ['1-69', '3', '0']
+url = u2
+for kwd, val in zip(kwds, nvals):
+    rg = r'(?<=(?:\?|&)' + kwd + r'=)(.*?)(?=&|$)'
+    print(rg)
+    url = re.sub(rg, val, url)
 
-if os.fork() == 0:
-    os.execlp('python', 'python', './yt_dl.py',
-              path, link, title, u1, u2)
-else:
-    print(os.wait())
+print(url)
+
+# if os.fork() == 0:
+#     os.execlp('python', 'python', './yt_dl.py',
+#               path, link, title, u1, u2)
+# else:
+#     print(os.wait())
 
 
 # print(requests.get(url, headers={

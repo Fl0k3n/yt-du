@@ -6,10 +6,10 @@ from typing import Dict, Iterable, List
 from collections import deque
 from backend.view.data_list_item import DataListItem
 from backend.model.db_models import Playlist, PlaylistLink
-from controller.playlist_manager import PlaylistManager
-from view.data_summary_box import DataSummaryBox
+from backend.controller.playlist_manager import PlaylistManager
+from backend.view.data_summary_box import DataSummaryBox
 from utils.commands.command import CallRcvrCommand, Command
-from controller.gui.view_changer import DataViewChanger
+from backend.controller.gui.view_changer import DataViewChanger
 
 
 class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
@@ -127,7 +127,6 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def link_dl_started(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
         self._set_pausable(playlist_link, True)
-
 
     def _update_status(self, item: Displayable):
         if item in self.displayable_to_view:

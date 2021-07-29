@@ -1,3 +1,4 @@
+import threading
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
 from backend.model.dl_task import DlTask
@@ -54,6 +55,7 @@ class DlManager(AppClosedObserver):
             DlCodes.PROCESS_FINISHED: self._on_process_finished,
             DlCodes.PROCESS_STOPPED: self._on_process_stopped,
             DlCodes.DL_ERROR: self._on_dl_error,
+            DlCodes.URL_EXPIRED: self._on_url_expired,
         }
 
         self.id_gen = self._create_task_id_gen()
@@ -122,7 +124,7 @@ class DlManager(AppClosedObserver):
         print('SENDING PERMISSION: ', permission)
 
         conn = self.connections[dl_data.task_id]
-        resp_msg = Message(DlCodes.DL_PERMISSION, permission)
+        resp_msg = Message(DlCodes.DL_PERMISSION, (link_id, permission))
 
         self.msger.send(conn, resp_msg)
 
@@ -182,6 +184,30 @@ class DlManager(AppClosedObserver):
         tid = dl_data.task_id
         self._clean_process_task(tid)
         self._check_queue()
+
+    def _on_url_expired(self, dl_data: DlData):
+        task = self._get_task(dl_data)
+        link_idx, media_url, last_successful = dl_data.data
+
+        def renew_():
+            renewed, is_consistent = task.renew_link(
+                link_idx, media_url, last_successful)
+
+            # if its insonsistent subprocess will terminate after rcving this msg
+            # TODO -> restart it (from separate thread bruh)
+
+            # + what if connection drops
+            try:
+                conn = self.connections[dl_data.task_id]
+                resp_msg = Message(DlCodes.URL_RENEWED,
+                                   (link_idx, renewed, is_consistent))
+
+                self.msger.send(conn, resp_msg)
+            except Exception as e:
+                print('Failed to renew urls', type(e), e)
+                # TODO
+
+        threading.Thread(target=renew_, daemon=True).start()
 
     def msg_rcvd(self, msg: Message):
         # key error raised on unsupported code

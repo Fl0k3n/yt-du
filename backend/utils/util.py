@@ -1,6 +1,6 @@
 import os
-from utils.assets_loader import AssetsLoader
-from utils.commands.command import Command
+from backend.utils.assets_loader import AssetsLoader
+from backend.utils.commands.command import Command
 
 
 def open_dir_in_explorer(path: str, not_exists_command: Command):

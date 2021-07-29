@@ -1,6 +1,6 @@
 from typing import List
-from model.db_models import Base, DataLink, Playlist, PlaylistLink
-from utils.assets_loader import AssetsLoader as AL
+from backend.model.db_models import Base, DataLink, Playlist, PlaylistLink
+from backend.utils.assets_loader import AssetsLoader as AL
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from backend.controller.gui.app_closed_observer import AppClosedObserver

@@ -17,17 +17,20 @@ class ExtCodes(Enum):
     LOST_CONNECTION = 6
     CONNECTION_NOT_ESTB = 7
 
+    FETCH_LINK = 8
+    LINK_FETCHED = 9
+
 
 class DlCodes(Enum):
     """Codes used for IPC with yt_dl worker"""
     TERMINATE = 0
     # data: str = absolute path of tmp files dir
     PROCESS_STARTED = 1
-    # data: tupe(int, str) = (index of data link, absolute path)
+    # data: tuple(int, str) = (index of data link, absolute path)
     DL_STARTED = 2
     # data: int = index of data link
     CAN_PROCEED_DL = 3
-    # data: bool = whether dl can be proceeded
+    # data: tuple(int, bool) = (link_id, whether dl can be proceeded)
     DL_PERMISSION = 4
     # data: tuple(int, int, str) = (index of data link, bytes dl'ed, chunk_url)
     CHUNK_FETCHED = 5
@@ -41,5 +44,9 @@ class DlCodes(Enum):
     PROCESS_FINISHED = 9
     # data: None
     PROCESS_STOPPED = 10
-    # data: tuple(int, str, str) = (index of dat link, type of exception, exception msg)
+    # data: tuple(int, str, str) = (index of data link, type of exception, exception msg)
     DL_ERROR = 11
+    # data: tuple(int, MediaURL, str|None) = (link_idx, mediaURL to-be-renewed, url of last successful chunk is this dl session)
+    URL_EXPIRED = 12
+    # data: tuple(int, MediaURL, bool) = (link_idx, renewed media url, info if its consistent)
+    URL_RENEWED = 13

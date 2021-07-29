@@ -1,7 +1,7 @@
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QWidget, QProgressBar, QScrollArea
-from view.data_list_item import DataListItem
-from view.scrollable_label import ScrollableLabel
+from backend.view.data_list_item import DataListItem
+from backend.view.scrollable_label import ScrollableLabel
 
 
 class LinkListItem(DataListItem):

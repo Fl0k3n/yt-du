@@ -1,8 +1,8 @@
 from backend.model.db_models import Playlist
-from controller.playlist_manager import PlaylistManager
-from utils.yes_no_dialog import YesNoDialog
-from utils.commands.command import CallRcvrCommand, Command
-from view.new_playlist_window import NewPlaylistWindow
+from backend.controller.playlist_manager import PlaylistManager
+from backend.utils.yes_no_dialog import YesNoDialog
+from backend.utils.commands.command import CallRcvrCommand, Command
+from backend.view.new_playlist_window import NewPlaylistWindow
 
 
 class NewPlaylistController:

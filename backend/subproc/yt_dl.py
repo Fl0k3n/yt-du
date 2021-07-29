@@ -7,7 +7,6 @@ Then download method should be called.
 Downloader downloads passed media links in separate threads, then merges them
 using ffmpeg subprocess, stderr of ffmpeg can be obtained.
 """
-from backend.subproc.ipc.ipc_codes import DlCodes
 import sys
 import re
 import os
@@ -43,7 +42,7 @@ def try_del(name, func=os.remove, msg="Failed to cleanup"):
 
 
 class StatusObserver(ABC):
-    """All download, exit, subproc creation methods have to be thread safe"""
+    """All download, exit, renew methods have to be thread safe"""
 
     @abstractmethod
     def process_started(self, tmp_files_dir_path: str):
@@ -108,7 +107,14 @@ class StatusObserver(ABC):
     def allow_exit(self):
         pass
 
-    # all subproc functions have to be thread save
+    # has to be thread safe
+    @abstractmethod
+    def renew_link(self, idx: int, media_url: "MediaURL", last_successful: str) -> Tuple["MediaURL", bool]:
+        """Returns media_url object which next(generate_chunk_urls) will give
+        up-to-date url that has failed before calling this method, it also returns bool 
+        indicating if dl can be continued using this link."""
+        pass
+
     @abstractmethod
     def allow_subproc_start():
         pass
@@ -194,6 +200,48 @@ class MediaURL(ABC):
     def get_raw_url(self) -> str:
         pass
 
+    def is_expired(self) -> bool:
+        return time.time() >= self.get_expire_time()
+
+    @staticmethod
+    def _get_query_params(url: str):
+        return parse.parse_qs(parse.urlparse(url).query)
+
+    @abstractmethod
+    def _get_renew_params(self) -> List[str]:
+        pass
+
+    def renew(self, renewed_url: "MediaURL", last_successful: str):
+        url = renewed_url.get_raw_url()
+
+        if last_successful is None:
+            if not self.resumed:
+                self.url = url
+                return
+            last_successful = self.url
+
+        self.expire = renewed_url.get_expire_time()
+        size = renewed_url.get_size()
+
+        if size != self.get_size():
+            raise UnsupportedURLError(url, msg='Sizes do not match')
+
+        old_state_params = self._get_query_params(last_successful)
+        try:
+            names = self._get_renew_params()
+            values = [old_state_params[name][0] for name in names]
+        except (KeyError) as e:
+            raise UnsupportedURLError(last_successful, str(
+                e), msg=f'Failed to extract state params')
+
+        self.url = url
+
+        for name, val in zip(names, values):
+            rg = r'(?<=(?:\?|&)' + name + r'=)(.*?)(?=&|$)'
+            self.url = re.sub(rg, val, self.url)
+
+        self.resumed = True
+
     @classmethod
     @abstractmethod
     def get_required_params(self) -> Iterable[str]:
@@ -214,8 +262,7 @@ class ClenMediaURL(MediaURL):
 
     def __init__(self, url: str, resumed: bool = False):
         super().__init__(url=url, resumed=resumed)
-        query = parse.urlparse(self.url).query
-        params = parse.parse_qs(query)
+        params = self._get_query_params(self.url)
         try:
             self.size = int(params['clen'][0])
             self.mime = params['mime'][0]
@@ -239,6 +286,9 @@ class ClenMediaURL(MediaURL):
     def set_size(self, size: int):
         self.size = size
 
+    def _get_renew_params(self) -> List[str]:
+        return ['range', 'rn', 'rbuf']
+
     def generate_chunk_urls(self) -> Generator[Tuple[str, int], None, None]:
         clen = self.get_size()
         link = self.get_raw_url()
@@ -251,19 +301,27 @@ class ClenMediaURL(MediaURL):
         except Exception as e:
             raise UnsupportedURLError(link, 'range', str(e))
 
+        # already finished
+        if self.resumed and base_r_end == clen - 1:
+            return
+
+        get_next = False
+
         if base_r_start == 0:
-            range_start = 0
-            range_end = self._MAX_CHUNK_SIZE - 1
+            if base_r_end == self._MAX_CHUNK_SIZE - 1 and self.resumed:
+                get_next = True
+            else:
+                range_start = 0
+                range_end = self._MAX_CHUNK_SIZE - 1
         else:
-            range_start = base_r_end + 1
-            range_end = base_r_end + self._MAX_CHUNK_SIZE
+            get_next = True
             if not self.resumed:
                 raise AttributeError(
                     'first chunk url starting at unexpected position ', self.get_raw_url())
 
-        # already finished
-        if self.resumed and base_r_end == clen - 1:
-            return
+        if get_next:
+            range_start = base_r_end + 1
+            range_end = base_r_end + self._MAX_CHUNK_SIZE
 
         end_found = False
 
@@ -370,7 +428,7 @@ class SegmentedMediaURL(MediaURL):
             last_seg = -1
 
         # already finished
-        if self.resumed and last_seg == self._get_seg_count():
+        if self.resumed and last_seg == self._get_seg_count() - 1:
             return
 
         for i in range(last_seg + 1, self._get_seg_count()):
@@ -417,6 +475,9 @@ class SegmentedMediaURL(MediaURL):
 
     def set_size(self, size: int):
         self.size = size
+
+    def _get_renew_params(self) -> List[str]:
+        return ['sq', 'rn', 'rbuf']
 
     def generate_chunk_urls(self) -> Generator[Tuple[str, int], None, None]:
         yield from zip(self._generate_chunk_urls(), self._get_seg_sizes())
@@ -488,6 +549,7 @@ class Codes(Enum):
     MERGE_FAILED = 2
     SUCCESS = 3
     DL_PERMISSION_DENIED = 4
+    INCONSISTENT_RENEW_LINKS = 5
 
 
 class YTDownloader:
@@ -590,12 +652,10 @@ class YTDownloader:
                         for i, (link, media_url, file_name) in enumerate(
             zip(self.data_links, self.media_urls, self.file_names))]
 
-    def _fetch(self, link, media_url, out_file_path, idx):
+    def _fetch(self, link: str, media_url: MediaURL, out_file_path: Path, idx: int):
         """fetches data links in chunks"""
         if self.status_obs is not None:
             self.status_obs.dl_started(idx, str(out_file_path))
-
-        print('DL MSG SENT')
 
         if self.verbose:
             print(f"[{self.title}] Fetching: {link[:150]}...")
@@ -607,19 +667,47 @@ class YTDownloader:
         else:
             f_mode = 'wb'
 
+        chunk_gen = enumerate(media_url.generate_chunk_urls())
+        last_successful = None
+
         with open(out_file_path, f_mode) as f:
-            for i, (chunk_link, chunk_size) in enumerate(media_url.generate_chunk_urls()):
+            # raw 'for loop' so generator can be changed during iteration
+            while True:
+                try:
+                    i, (chunk_link, chunk_size) = next(chunk_gen)
+                except StopIteration:
+                    break
+
                 retried = 0
                 while True:
                     try:
+                        r = requests.get(
+                            chunk_link, stream=True, timeout=self.retry_timeout)
+
+                        if r.headers['Content-Length'] == '0' and media_url.is_expired():
+                            if self.status_obs is None:
+                                print(f'{link} has expired, aborting.')
+                                self.thread_status[idx] = Codes.FETCH_FAILED
+                                try_del(tmp_file_path)
+                                return
+                            media_url, is_consistent = self.status_obs.renew_link(idx,
+                                                                                  media_url, last_successful)
+
+                            if not is_consistent:
+                                print('links are inconsistent, aborting')
+                                self.thread_status[idx] = Codes.INCONSISTENT_RENEW_LINKS
+                                try_del(tmp_file_path)
+                                return
+
+                            chunk_gen = enumerate(
+                                media_url.generate_chunk_urls(), i)
+                            break
+
+                        if not 200 <= r.status_code < 300:
+                            raise ValueError(
+                                f'CHUNK: {i} STATUS: {r.status_code}\n HEADERS: {r.headers}')
+
                         with open(tmp_file_path, 'wb') as tmp_f:
-                            r = requests.get(
-                                chunk_link, stream=True, timeout=self.retry_timeout, )
-
-                            if not 200 <= r.status_code < 300:
-                                raise ValueError(
-                                    f'CHUNK: {i} STATUS: {r.status_code}\n HEADERS: {r.headers}')
-
                             for chunk in r.iter_content(chunk_size=512):
                                 tmp_f.write(chunk)
 
@@ -643,6 +731,8 @@ class YTDownloader:
                             self.status_obs.chunk_fetched(
                                 idx, chunk_size, chunk_link)
                             self.status_obs.allow_exit()
+
+                        last_successful = chunk_link
 
                         break
                     except Exception as e:
@@ -744,6 +834,11 @@ class YTDownloader:
 
             if status == Codes.DL_PERMISSION_DENIED:
                 return 0, 'DL PERMISSION DENIED'
+            if status == Codes.INCONSISTENT_RENEW_LINKS and self.cleanup:
+                # if they are inconsistent all of that data is most likely useless
+                # process should be run again with renewed links
+                self._clean_up()
+                return 0, 'INCONSISTENT RENEW LINKS'
         else:
             status = Codes.SUCCESS
 
@@ -760,7 +855,7 @@ class YTDownloader:
         if status == Codes.SUCCESS and self.verbose:
             print(f"[{self.title}] OK. Merged successfully.")
 
-        if self.cleanup:
+        if status == Codes.SUCCESS and self.cleanup:
             self._clean_up()
 
         if self.status_obs is not None:
@@ -780,6 +875,7 @@ class YTDownloader:
         status = Codes.SUCCESS  # no errors yet
 
         permission_denied = False
+        inconsitent_renew = False
 
         # cant zip because not updated data might be generated
         for i, thread in enumerate(self.threads):
@@ -792,6 +888,9 @@ class YTDownloader:
                 permission_denied = True
                 # all threads have to be joined
                 continue
+            elif self.thread_status[i] == Codes.INCONSISTENT_RENEW_LINKS:
+                inconsitent_renew = True
+                continue
 
             if self.status_obs is not None:
                 self.status_obs.dl_finished(i)
@@ -801,6 +900,9 @@ class YTDownloader:
                 print(
                     f"[{self.title}] Aborting, failed to download \n{self.data_links[i]}")
                 break
+
+        if inconsitent_renew:
+            return Codes.INCONSISTENT_RENEW_LINKS
 
         if permission_denied:
             print('dl permission denied, exiting')

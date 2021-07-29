@@ -17,12 +17,14 @@ const CODES = {
     PING: 5, //depracated
     LOST_CONNECTION: 6, // irrelevant here
     CONNECTION_NOT_ESTB: 7, // irrelevant here
+    FETCH_LINK: 8,
+    LINK_FETCHED: 9
 }
 ///////////////////////////////
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5557, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = 5552, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;
@@ -38,7 +40,8 @@ class ConnectionHandler {
 
     init() {
         this.socket = new WebSocket(`ws://127.0.0.1:${this.PORT}`);
-        this.extractor = new LinkExtractor(this);
+        this.playlistExtractor = new PlaylistLinkExtractor(this);
+        this.LinkExtractor = new LinkExtractor(this);
 
         this.socket.addEventListener('error', err => this.onError(err));
         this.socket.addEventListener('open', ev => this.onConnected(ev));
@@ -65,8 +68,11 @@ class ConnectionHandler {
         console.log("GOT MSG: ", msg_ob);
         const code = msg_ob['code'];
         const data = msg_ob['data'];
+
         if (code == CODES.FETCH_PLAYLIST)
-            this.extractor.addPlaylist(data['url'], msg_ob);
+            this.playlistExtractor.addPlaylist(data['url'], msg_ob);
+        else if (code == CODES.FETCH_LINK)
+            this.LinkExtractor.addLink(data['url'], msg_ob);
         else if (code == CODES.PING)
             this.pingedBack = true;
         else
@@ -127,7 +133,7 @@ class ConnectionHandler {
         // }
     }
 
-    _sendData(playlist, code, data, echo) {
+    _sendPlaylistData(playlist, code, data, echo) {
         const msg_data = {
             ...data,
             playlist: playlist,
@@ -155,17 +161,32 @@ class ConnectionHandler {
             })
         };
 
-        this._sendData(playlist, CODES.PLAYLIST_FETCHED, data, echo);
+        this._sendPlaylistData(playlist, CODES.PLAYLIST_FETCHED, data, echo);
         console.log("sending ", data, echo);
     }
 
     sendFailureMsg(playlist, code, reason) {
-        this._sendData(playlist, code, reason);
+        this._sendPlaylistData(playlist, code, reason);
+    }
+
+    // TODO make it consistent lmao
+    sendSingleLink(link, dataLinks, echo) {
+        console.log('SENDING SINGLE LINK', link, dataLinks,
+            echo, '\n--------------------------');
+        this.socket.send(JSON.stringify({
+            code: CODES.LINK_FETCHED,
+            data: {
+                link: link,
+                dataLinks: dataLinks,
+                echo: echo
+            }
+        }));
     }
 }
 
 
-class LinkExtractor {
+// TODO refactor this class so it uses LinkExtractor
+class PlaylistLinkExtractor {
     constructor(communicationHandler) {
         this.MAX_BATCH_TABS = 5; // if playlist has > 5 links, they will be opened in separete runs
 
@@ -359,6 +380,83 @@ class LinkExtractor {
         return url.includes('rbuf=0');
     }
 
+}
+
+
+class LinkExtractor {
+    // Handles extraction of single link
+    constructor(communicationHandler) {
+        this.communicationHandler = communicationHandler;
+
+        this.linkMap = new Map(); // url -> {linksArr: [str], requiredTypes: Set[str], echo: original request}
+        this.tabsMap = new Map(); // tabId -> url
+
+        chrome.webRequest.onCompleted.addListener(details => this._linkIntecepted(details), {
+            urls: ["*://*.googlevideo.com/*"]
+        });
+    }
+
+    addLink(link, echo) {
+        if (this.linkMap.has(link)) {
+            console.log(`link ${link} already enqueued`);
+            return;
+        }
+        this.linkMap.set(link, {
+            linksArr: [],
+            requiredTypes: new Set(['audio', 'video']),
+            echo: echo
+        });
+        this._getDataLinks(link);
+    }
+
+    _getDataLinks(link) {
+        chrome.tabs.create({
+            active: false,
+            url: link
+        }, tab => {
+            this.tabsMap.set(tab.id, link);
+        });
+    }
+
+    _linkIntecepted(details) {
+        const { tabId } = details;
+        const link = this.tabsMap.get(tabId);
+
+        if (link && this._isValid(details.url)) {
+            const { linksArr, requiredTypes } = this.linkMap.get(link);
+            try {
+                const mimesRe = /mime=(\w+)/;
+                const type = details.url.match(mimesRe)[1];
+
+                if (requiredTypes.has(type))
+                    requiredTypes.delete(type);
+                else
+                    return;
+
+                linksArr.push(details.url);
+                // got 2 links (audio + video) this playlist's link is done
+                if (linksArr.length == 2)
+                    this._tabReady(tabId, link);
+            }
+            catch (err) {
+                console.error(`url ${details.url} is invalid`, err);
+                console.log(link);
+            }
+        }
+    }
+
+    _tabReady(tabId, link,) {
+        this.tabsMap.delete(tabId);
+        const { linksArr, echo } = this.linkMap.get(link);
+        this.linkMap.delete(link);
+
+        chrome.tabs.remove(tabId);
+        this.communicationHandler.sendSingleLink(link, linksArr, echo);
+    }
+
+    _isValid(url) {
+        return url.includes('rbuf=0');
+    }
 }
 
 

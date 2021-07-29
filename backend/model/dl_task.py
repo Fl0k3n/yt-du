@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from backend.subproc.yt_dl import Resumer
+from backend.subproc.yt_dl import MediaURL, Resumer
 from backend.model.db_models import DataLink
-from typing import List
+from typing import List, Tuple
 
 
 class DlTask(ABC):
@@ -70,6 +70,10 @@ class DlTask(ABC):
 
     @abstractmethod
     def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
+        pass
+
+    @abstractmethod
+    def renew_link(self, link_idx: int, media_url: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
         pass
 
     def are_all_downloads_finished(self) -> bool:

@@ -1,7 +1,7 @@
 from typing import Iterable
 from PyQt5.QtWidgets import QFrame, QListWidgetItem, QScrollArea, QListWidget, QHBoxLayout, QVBoxLayout, QLabel, QWidget
 from PyQt5 import Qt
-from view.data_list_item import DataListItem
+from backend.view.data_list_item import DataListItem
 
 
 class DataSummaryBox(QFrame):

@@ -2,7 +2,7 @@ from abc import abstractmethod
 from backend.model.data_status import DataStatus
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
-from view.data_list_item import DataListItem
+from backend.view.data_list_item import DataListItem
 
 # should derive from ABC, deleted because of metaclass conficts
 
@@ -38,5 +38,5 @@ class Displayable:
             size = f'{round(size_bytes / 1073741824 * 100) / 100} GB'
         else:
             size = f'{round(size_bytes / 1048576 * 100) / 100} MB'
-        
+
         return size

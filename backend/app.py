@@ -2,10 +2,10 @@ from backend.controller.speedo import Speedo
 import sys
 from typing import List
 from PyQt5.QtWidgets import QApplication
-from controller.db_handler import DBHandler
-from controller.playlist_manager import PlaylistManager
-from controller.gui.main_window_ctl import MainWindowController
-from subproc.ipc.ipc_manager import IPCManager
+from backend.controller.db_handler import DBHandler
+from backend.controller.playlist_manager import PlaylistManager
+from backend.controller.gui.main_window_ctl import MainWindowController
+from backend.subproc.ipc.ipc_manager import IPCManager
 
 
 class App(QApplication):

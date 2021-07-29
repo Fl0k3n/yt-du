@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QDialog, QGridLayout, QLabel, QPushButton
-from utils.commands.command import Command
+from backend.utils.commands.command import Command
 
 
 class YesNoDialog(QDialog):

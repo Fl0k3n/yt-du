@@ -1,14 +1,15 @@
-from typing import List
+from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
+from typing import Any, Dict, List
 import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
-from backend.model.db_models import Playlist
+from backend.model.db_models import Playlist, PlaylistLink
 import multiprocessing as mp
-from multiprocessing.connection import Connection
-from subproc.ext_server import run_server
+from backend.subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.controller.gui.app_closed_observer import AppClosedObserver
+import threading
 
 
 class ExtManager(AppClosedObserver):
@@ -16,13 +17,26 @@ class ExtManager(AppClosedObserver):
         self.msger = msger
 
         self.pl_fetched_obss: List[PlaylistFetchedObserver] = []
+        self.link_fetched_obss: List[LinkFetchedObserver] = []
         self.subproc_obss: List[SubprocLifetimeObserver] = []
+
+        # url -> original link
+        self.fetch_link_queries: Dict[str, PlaylistLink] = {}
 
         self.msg_handlers = {
             ExtCodes.PLAYLIST_FETCHED: self._on_playlist_fetched,
             ExtCodes.CONNECTION_NOT_ESTB: self._on_conn_not_estb,
             ExtCodes.LOST_CONNECTION: self._on_conn_lost,
+            ExtCodes.LINK_FETCHED: self._on_link_fetched,
         }
+
+        self.last_query_id = -1
+        # for renew requests url -> id of query
+        self.blocking_link_queries: Dict[str, int] = {}
+        # query id -> whatever response was
+        self.blocking_link_responses: Dict[int, Any] = {}
+        self.link_fetch_lock = threading.Lock()
+        self.link_fetched_cond = threading.Condition(self.link_fetch_lock)
 
     def start(self):
         self.ext_conn, child_conn = mp.Pipe(duplex=True)
@@ -39,6 +53,9 @@ class ExtManager(AppClosedObserver):
     def add_subproc_lifetime_observer(self, obs: SubprocLifetimeObserver):
         self.subproc_obss.append(obs)
 
+    def add_link_fetched_observer(self, obs: LinkFetchedObserver):
+        self.link_fetched_obss.append(obs)
+
     def query_playlist_links(self, playlist: Playlist):
         ext_data = {
             'url': playlist.url,
@@ -47,7 +64,16 @@ class ExtManager(AppClosedObserver):
 
         msg = Message(ExtCodes.FETCH_PLAYLIST, ext_data)
         self.msger.send(self.ext_conn, msg)
-        print('sent to server')
+
+    def query_link(self, playlist_link: PlaylistLink):
+        ext_data = {
+            'url': playlist_link.url
+        }
+
+        self.fetch_link_queries[playlist_link.url] = playlist_link
+
+        msg = Message(ExtCodes.FETCH_LINK, ext_data)
+        self.msger.send(self.ext_conn, msg)
 
     def msg_rcvd(self, msg: Message):
         # will raise KeyError for wrong code
@@ -72,6 +98,22 @@ class ExtManager(AppClosedObserver):
             obs.on_playlist_fetched(
                 playlist_id, playlist_idxs, links, titles, data_links)
 
+    def _on_link_fetched(self, msg: Message):
+        data = msg.data
+        link = data['link']
+        data_links = data['dataLinks']
+        print('got links', data_links)
+
+        with self.link_fetch_lock:
+            if link in self.blocking_link_queries:
+                q_id = self.blocking_link_queries.pop(link)
+                self.blocking_link_responses[q_id] = data_links
+                self.link_fetched_cond.notify_all()
+            else:
+                playlist_link = self.fetch_link_queries.pop(link)
+                for obs in self.link_fetched_obss:
+                    obs.on_link_fetched(playlist_link, data_links)
+
     def _on_conn_lost(self, msg: Message):
         still_alive = msg.data
         if still_alive == 0:
@@ -90,3 +132,21 @@ class ExtManager(AppClosedObserver):
         self.msger.send(self.ext_conn, Message(ExtCodes.TERMINATE))
         for obs in self.subproc_obss:
             obs.on_termination_requested(self.ext_proc, self.ext_conn)
+
+    def query_link_blocking(self, playlist_link: PlaylistLink) -> List[str]:
+        ext_data = {
+            'url': playlist_link.url
+        }
+        with self.link_fetch_lock:
+            self.last_query_id += 1
+            q_id = self.last_query_id
+            self.blocking_link_queries[playlist_link.url] = q_id
+
+        msg = Message(ExtCodes.FETCH_LINK, ext_data)
+        self.msger.send(self.ext_conn, msg)
+
+        with self.link_fetch_lock:
+            while q_id not in self.blocking_link_responses:
+                self.link_fetched_cond.wait()
+
+            return self.blocking_link_responses.pop(q_id)

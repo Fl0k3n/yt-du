@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from view.data_summary_box import DataSummaryBox
+from backend.view.data_summary_box import DataSummaryBox
 
 
 class DataViewChanger(ABC):
