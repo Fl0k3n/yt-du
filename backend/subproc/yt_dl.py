@@ -838,7 +838,6 @@ class YTDownloader:
                 # if they are inconsistent all of that data is most likely useless
                 # process should be run again with renewed links
                 self._clean_up()
-                return 0, 'INCONSISTENT RENEW LINKS'
         else:
             status = Codes.SUCCESS
 

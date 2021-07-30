@@ -1,20 +1,22 @@
-import threading
-from backend.subproc.yt_dl import MediaURL, UnsupportedURLError
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
+from backend.controller.link_renewer import LinkRenewer
+from backend.subproc.yt_dl import MediaURL
 from backend.controller.playlist_dl_manager import PlaylistDlManager
-from typing import Dict, List, Tuple
+from typing import Deque, Dict, List, Tuple
 from backend.model.dl_task import DlTask
 from backend.model.db_models import DataLink, PlaylistLink
+from collections import deque
 
 
 class PlaylistLinkTask(DlTask):
     def __init__(self, playlist_link: PlaylistLink, pl_dl_mgr: PlaylistDlManager,
-                 dest_path: str, url: str, data_links: List[DataLink]):
+                 link_renewer: LinkRenewer, dest_path: str, url: str, data_links: List[DataLink]):
         super().__init__(dest_path, url, data_links)
         self.pl_dl_mgr = pl_dl_mgr
+        self.link_renewer = link_renewer
         self.playlist_link = playlist_link
         self.finished_dls = 0
-        self.renewed_links: Dict[int, MediaURL] = {}
-        self.renew_links_lock = threading.Lock()
+        # mime -> renewed datalink(raw) converted to MediaURL
 
     def process_started(self, tmp_files_dir: str):
         self.pl_dl_mgr.on_process_started(self.playlist_link, tmp_files_dir)
@@ -52,21 +54,11 @@ class PlaylistLinkTask(DlTask):
     def process_stopped(self):
         self.pl_dl_mgr.on_process_paused(self.playlist_link)
 
-    def renew_link(self, link_idx: int, media_url: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
-        mime = media_url.get_mime()
-        with self.renew_links_lock:
-            if mime in self.renewed_links:
-                renewed = self.renewed_links.pop(mime)
-            else:
-                for link in self.pl_dl_mgr.get_renewed_links(self.playlist_link):
-                    r_mime = link.get_mime()
-                    if r_mime == mime:
-                        renewed = link
-                    else:
-                        self.renewed_links[r_mime] = link
-
-            return self.pl_dl_mgr.renew_link(self.playlist_link, self.data_links[link_idx],
-                                             media_url, renewed, last_successful)
+    def renew_link(self, task_id: int, link_idx: int,
+                   media_url: MediaURL, last_successful: str):
+        self.link_renewer.query_renewed_links(self.playlist_link,
+                                              self.data_links[link_idx], task_id,
+                                              link_idx, media_url, last_successful)
 
     def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
         # TODO

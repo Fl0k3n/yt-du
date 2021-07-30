@@ -1,30 +1,31 @@
-from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
-from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
 from backend.model.playlist_link_task import PlaylistLinkTask
 from backend.controller.playlist_dl_manager import PlaylistDlManager
 from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Deque, Dict, Iterable, List, Set, Tuple
 from backend.controller.db_handler import DBHandler
 from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import MediaURL, create_media_url, UnsupportedURLError
+from backend.controller.link_renewer import LinkRenewer
 import datetime
 from collections import defaultdict
 
+# TODO destructure it into smaller objects :PPPPP
 
-class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlManager):
-    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo):
+
+class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager):
+    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo, link_renewer: LinkRenewer):
         self.db = db
         self.ipc_mgr = ipc_mgr
         self.speedo = speedo
+        self.link_renewer = link_renewer
 
         self.ipc_mgr.add_playlist_fetched_observer(self)
-        self.ipc_mgr.add_link_fetched_observer(self)
         self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
         # playlist_url -> idx in list above
         self.pl_url_map: Dict[str, int] = {}
@@ -162,8 +163,7 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
         self.dled_pl_bytes[playlist.playlist_id] = 0
 
         for pl_link in pl_links:
-            task = PlaylistLinkTask(
-                pl_link, self, pl_link.path, pl_link.url, pl_link.data_links)
+            task = self._create_task(pl_link)
             task_id = self.ipc_mgr.schedule_dl_task(task)
             link_task_ids[pl_link] = task_id
 
@@ -215,6 +215,7 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
         if link_id not in self.link_dling_count:
             self.link_dling_count[link_id] = 1
             playlist_link.set_status(DataStatus.DOWNLOADING)
+            self.link_renewer.set_consistent(playlist_link, True)
             first_data_link = True
         else:
             self.link_dling_count[link_id] += 1
@@ -245,7 +246,8 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
             self.speedo.dl_resumed(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
-        return playlist_link not in self.link_pause_requests
+        return playlist_link not in self.link_pause_requests and \
+            self.link_renewer.is_consistent(playlist_link)
 
     def on_dl_progress(self, playlist_link: PlaylistLink,
                        data_link: DataLink, bytes_fetched: int, chunk_url: str):
@@ -358,12 +360,15 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
 
         playlist = playlist_link.playlist
 
-        if self._is_playlist_finished(playlist):
+        if not self.link_renewer.is_consistent(playlist_link):
+            self._handle_inconsistent(playlist_link)
+        elif self._is_playlist_finished(playlist):
             playlist.set_status(DataStatus.FINISHED)
             self.db.commit()
 
             for obs in self.pl_modified_observers:
                 obs.playlist_finished(playlist)
+
         elif self._is_playlist_paused(playlist):
             playlist.set_status(DataStatus.PAUSED)
             self.db.commit()
@@ -482,8 +487,7 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
         self.link_resume_requests.add(playlist_link)
 
         resumer = PlaylistLinkResumer(playlist_link)
-        task = PlaylistLinkTask(
-            playlist_link, self, playlist_link.path, playlist_link.url, playlist_link.data_links)
+        task = self._create_task(playlist_link)
 
         task.resume(resumer)
         task_id = self.ipc_mgr.schedule_dl_task(task)
@@ -499,22 +503,32 @@ class PlaylistManager(PlaylistFetchedObserver, LinkFetchedObserver, PlaylistDlMa
         for obs in self.pl_modified_observers:
             obs.playlist_link_resume_requested(playlist_link)
 
-    def get_renewed_links(self, playlist_link: PlaylistLink) -> List[MediaURL]:
-        data_links = self.ipc_mgr.query_link_blocking(playlist_link)
-        # will raise UnsupportedURLError on failure
-        return [create_media_url(link, resumed=False) for link in data_links]
+    def _create_task(self, playlist_link) -> PlaylistLinkTask:
+        return PlaylistLinkTask(
+            playlist_link, self, self.link_renewer, playlist_link.path,
+            playlist_link.url, playlist_link.data_links)
 
-    def on_link_fetched(self, original_link: PlaylistLink, data_links: Iterable[str]):
-        pass
+    def _handle_inconsistent(self, playlist_link: PlaylistLink):
+        # called when process downloading inconsistent link finishes
+        playlist_link.tmp_files_dir = None
+        playlist_link.set_status(DataStatus.WAIT_FOR_DL)
 
-    def renew_link(self, playlist_link: PlaylistLink, data_link: DataLink, old: MediaURL,
-                   renewed: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
-        # TODO update database entry of data_link (this is called from separate thread)
-        if type(renewed) == type(old):
-            try:
-                old.renew(renewed, last_successful)
-                return old, True
-            except UnsupportedURLError as e:
-                print('Failed to renew url', e)
+        self.pl_sizes[playlist_link.playlist_id] -= \
+            self.pl_link_sizes[playlist_link.link_id]
+        self.pl_link_sizes[playlist_link.link_id] = \
+            playlist_link.get_size_bytes()
 
-        return renewed, False
+        for dlink in playlist_link.data_links:
+            self.dled_link_bytes[playlist_link.link_id] -= dlink.downloaded
+            self.dled_pl_bytes[playlist_link.playlist_id] -= dlink.downloaded
+            dlink.downloaded = 0
+            dlink.last_chunk_url = None
+
+        self.db.commit()
+
+        task = self._create_task(playlist_link)
+        task_id = self.ipc_mgr.schedule_dl_task(task)
+        self.pl_tasks[playlist_link.playlist_id][playlist_link] = task_id
+
+        for obs in self.pl_modified_observers:
+            obs.inconsistenty_fixed(playlist_link)

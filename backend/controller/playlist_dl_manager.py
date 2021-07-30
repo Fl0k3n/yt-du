@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from backend.subproc.yt_dl import MediaURL
-from typing import Iterable, List, Tuple
+from typing import List
 from backend.model.db_models import DataLink, PlaylistLink
 
 
@@ -46,15 +45,4 @@ class PlaylistDlManager(ABC):
 
     @abstractmethod
     def on_process_paused(self, playlist_link: PlaylistLink):
-        pass
-
-    @abstractmethod
-    def get_renewed_links(self, playlist_link: PlaylistLink) -> Iterable[MediaURL]:
-        """blocks thread until response is fetched"""
-        pass
-
-    @abstractmethod
-    def renew_link(self, playlist_link: PlaylistLink, data_link: DataLink, old: MediaURL,
-                   renewed: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
-        """returns renewed mediaurl and info if it was successfully renewed"""
         pass

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
 from backend.subproc.yt_dl import MediaURL, Resumer
 from backend.model.db_models import DataLink
-from typing import List, Tuple
+from typing import Iterable, List, Tuple
 
 
 class DlTask(ABC):
@@ -12,6 +13,7 @@ class DlTask(ABC):
         self.finished_dls = 0
         self.resumed = False
         self.resumer = None
+        self.link_renewed_observer = None
 
     def resume(self, resumer: Resumer):
         self.resumed = True
@@ -73,7 +75,8 @@ class DlTask(ABC):
         pass
 
     @abstractmethod
-    def renew_link(self, link_idx: int, media_url: MediaURL, last_successful: str) -> Tuple[MediaURL, bool]:
+    def renew_link(self, task_id: int, link_idx: int,
+                   media_url: MediaURL, last_successful: str):
         pass
 
     def are_all_downloads_finished(self) -> bool:

@@ -1,3 +1,5 @@
+from backend.subproc.yt_dl import MediaURL
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
 from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
 import time
 import threading
@@ -69,7 +71,7 @@ class IPCListener(QObject):
             self.conn_mutex.unlock()
 
 
-class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
+class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver):
     # if after this #seconds child is still alive, it will rcv SIGKILL (or mp equivalent)
     _KILL_CHILDREN_TIMEOUT = 1
     # non blocking join is issued after this #seconds
@@ -202,3 +204,7 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver):
     def pause_dl(self, task_id: int) -> bool:
         """returns True if task was running """
         return self.dl_manager.pause_task(task_id)
+
+    def on_link_renewed(self, task_id: int, link_idx: int, renewed: MediaURL, is_consistent: bool):
+        self.dl_manager.on_link_renewed(
+            task_id, link_idx, renewed, is_consistent)

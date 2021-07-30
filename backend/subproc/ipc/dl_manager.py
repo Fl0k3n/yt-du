@@ -1,3 +1,4 @@
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
 import threading
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
@@ -7,26 +8,13 @@ from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserve
 from backend.subproc.ipc.message import DlData, Message, Messenger
 from collections import deque
 import multiprocessing as mp
-from backend.subproc.yt_dl import Resumer, YTDownloader
+from backend.subproc.yt_dl import MediaURL, Resumer, YTDownloader
 from backend.subproc.ipc.piped_status_observer import PipedStatusObserver
 from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.subproc.ipc.stored_dl_task import StoredDlTask
 
 
-class StoredDlTask:
-    def __init__(self, task: DlTask, task_id: int):
-        self.task = task
-        self.task_id = task_id
-
-    def __eq__(self, other) -> bool:
-        if isinstance(other, StoredDlTask):
-            return self.task_id == other.task_id
-        return False
-
-    def __hash__(self) -> int:
-        return hash(self.task_id)
-
-
-class DlManager(AppClosedObserver):
+class DlManager(AppClosedObserver, LinkRenewedObserver):
     _MAX_BATCH_DL = 10
 
     def __init__(self, msger: Messenger):
@@ -188,26 +176,7 @@ class DlManager(AppClosedObserver):
     def _on_url_expired(self, dl_data: DlData):
         task = self._get_task(dl_data)
         link_idx, media_url, last_successful = dl_data.data
-
-        def renew_():
-            renewed, is_consistent = task.renew_link(
-                link_idx, media_url, last_successful)
-
-            # if its insonsistent subprocess will terminate after rcving this msg
-            # TODO -> restart it (from separate thread bruh)
-
-            # + what if connection drops
-            try:
-                conn = self.connections[dl_data.task_id]
-                resp_msg = Message(DlCodes.URL_RENEWED,
-                                   (link_idx, renewed, is_consistent))
-
-                self.msger.send(conn, resp_msg)
-            except Exception as e:
-                print('Failed to renew urls', type(e), e)
-                # TODO
-
-        threading.Thread(target=renew_, daemon=True).start()
+        task.renew_link(dl_data.task_id, link_idx, media_url, last_successful)
 
     def msg_rcvd(self, msg: Message):
         # key error raised on unsupported code
@@ -252,3 +221,10 @@ class DlManager(AppClosedObserver):
             return True
         except KeyError:
             print(f'Task {tid} is already finished')
+
+    def on_link_renewed(self, task_id: int, link_idx: int, renewed: MediaURL, is_consistent: bool):
+        conn = self.connections[task_id]
+        resp_msg = Message(DlCodes.URL_RENEWED,
+                           (link_idx, renewed, is_consistent))
+
+        self.msger.send(conn, resp_msg)

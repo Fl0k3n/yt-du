@@ -256,3 +256,12 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self.displayable_to_view[playlist].set_dl_speed(str(speed_MBps))
         except KeyError:
             pass
+
+    def inconsistenty_fixed(self, playlist_link: PlaylistLink):
+        playlist = playlist_link.playlist
+        self._set_pausable(playlist_link, True)
+        self._set_resumable(playlist_link, False)
+        self._update_status(playlist_link)
+        self._update_status(playlist)
+        self._update_link_progress(playlist_link)
+        self._update_pl_progress(playlist)
