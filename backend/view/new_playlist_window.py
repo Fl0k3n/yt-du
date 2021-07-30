@@ -1,8 +1,13 @@
+from backend.view.scrollable_label import ScrollableLabel
 from backend.utils.commands.command import Command
-from PyQt5.QtWidgets import QDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QDialog, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from backend.utils.assets_loader import AssetsLoader as AL
+from PyQt5.QtCore import Qt
 
 
 class NewPlaylistWindow(QDialog):
+    _DEFAULT_OUT_PATH = AL.get_env('DEFAULT_OUT_PATH')
+
     def __init__(self, on_view_closed: Command, on_accepted: Command):
         super().__init__()
         self.on_view_closed = on_view_closed
@@ -15,44 +20,31 @@ class NewPlaylistWindow(QDialog):
 
         self.layout.addWidget(options_box)
 
-        self.inputs = [QLineEdit() for _ in range(3)]
-        labels = [QLabel(x) for x in ['url', 'name', 'path']]
+        self.inputs = [QLineEdit() for _ in range(2)]
+        labels = [QLabel(x) for x in ['url', 'name']]
 
         for i, (lab, inp) in enumerate(zip(labels, self.inputs)):
             grid_layout.addWidget(lab, i+1, 1)
             grid_layout.addWidget(inp, i+1, 2)
 
-        self.url_input, self.name_input, self.path_input = self.inputs
+        path_btn = QPushButton('Select Path')
 
-        # TODO
-        # SHORT
-        # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=opgO6h9FIxA&list=PLtjUk3SyYzL5RTjUjk47FH6nCzBo69MMX')
-        # self.name_input.setText('GOTHIC TEST')
-        # self.path_input.setText('/home/flok3n/music')
+        self.cur_path_label = ScrollableLabel(
+            self, 200, 20, self._DEFAULT_OUT_PATH)
+        self.cur_path_label.setAlignment(Qt.AlignLeft)
 
-        # # MEDIUM
-        # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=wMSUZhsmttA&list=PLUhmme4GQ9xonblEQQJRLyQzXzmafS_nj')
-        # self.name_input.setText('LIVE LOVE ASAP TEST')
-        # self.path_input.setText('/home/flok3n/music')
+        grid_layout.addWidget(QLabel('path'), len(labels) + 1, 1)
+        grid_layout.addWidget(self.cur_path_label, len(labels)+1, 2)
+        grid_layout.addWidget(path_btn, len(labels) + 2, 1)
 
-        # # LONG
-        # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=N_re96JNjxE&list=PL-3XmUCH8wflSD1mcS9VU6g5VtlCTtqOu')
-        # self.name_input.setText('GIMPER TEST')
-        # self.path_input.setText('/home/flok3n/music')
+        self.url_input, self.name_input = self.inputs
+
+        path_btn.clicked.connect(self._open_file_explorer)
 
         # OWN
         self.url_input.setText(
             'https://www.youtube.com/watch?v=8xH0sdjMINY&list=PL-wtbH6CyQQZIkOpf2yWjfp_EL9R52olh&index=1')
         self.name_input.setText('OWN TEST')
-        self.path_input.setText('/home/flok3n/music')
-
-        # SQ
-        # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=wwRfa0cPY-0&list=PL-wtbH6CyQQbdbbYDwUkQUtMj-M22VQNq&index=1')
-        # self.name_input.setText('SQ TEST')
         # self.path_input.setText('/home/flok3n/music')
 
         btn_box = QWidget()
@@ -69,8 +61,25 @@ class NewPlaylistWindow(QDialog):
         for btn in [self.add_btn, self.cancel_btn]:
             inner_layout.addWidget(btn)
 
-    def get_inputs(self):
-        return self.inputs
+    def _open_file_explorer(self):
+        dlg = QFileDialog(directory=self._DEFAULT_OUT_PATH)
+        dlg.setFileMode(QFileDialog.Directory)
+        dlg.setOption(QFileDialog.ShowDirsOnly)
+        if dlg.exec():
+            idk = dlg.selectedFiles()
+            if len(idk) > 1:
+                print('Only one file is required')
+            else:
+                self.cur_path_label.setText(idk[0])
+
+    def get_url(self) -> str:
+        return self.url_input.text()
+
+    def get_name(self) -> str:
+        return self.name_input.text()
+
+    def get_path(self) -> str:
+        return self.cur_path_label.text()
 
     def closeEvent(self, a0):
         self.on_view_closed.execute()

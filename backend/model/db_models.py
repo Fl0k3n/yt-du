@@ -38,7 +38,8 @@ class Playlist(Base, Displayable):
     finished_at = Column(TIMESTAMP, nullable=True)
     status = Column(Integer, nullable=False, server_default=text('0'))
     links = relationship("PlaylistLink", back_populates="playlist",
-                         order_by="PlaylistLink.playlist_number")
+                         order_by="PlaylistLink.playlist_number",
+                         cascade="all, delete")
 
     def to_data_list_item(self, show_details_command: Command,
                           pause_command: Command, resume_command: Command,
@@ -91,7 +92,8 @@ class PlaylistLink(Base, Displayable):
     tmp_files_dir = Column(Text, nullable=True)
 
     playlist = relationship("Playlist", back_populates="links")
-    data_links = relationship('DataLink', back_populates='link')
+    data_links = relationship(
+        'DataLink', back_populates='link', cascade="all, delete")
     merges = relationship('MergeData', back_populates='link')
 
     def to_data_list_item(self, show_details_command: Command,

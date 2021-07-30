@@ -1,8 +1,9 @@
+from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from backend.controller.gui.view_changed_observer import ViewChangedObserver
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.model.displayable import Displayable
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Set
 from collections import deque
 from backend.view.data_list_item import DataListItem
 from backend.model.db_models import Playlist, PlaylistLink
@@ -13,8 +14,9 @@ from backend.controller.gui.view_changer import DataViewChanger
 
 
 class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
-    _MAX_VISIBLE = 7
+    _MAX_VISIBLE = 999999  # TODO
     _BOX_WIDTH, _BOX_HEIGHT = 700, 600
+    _DELETE_PL_MENU_NAME = 'Delete Entry'
 
     def __init__(self, view_changer: DataViewChanger, playlist_manager: PlaylistManager):
         self.playlist_mgr = playlist_manager
@@ -32,6 +34,8 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
 
         self.visible_playlists: List[DataListItem] = []
         self.displayable_to_view: Dict[Displayable, DataListItem] = {}
+
+        self.displayable_to_summary_box: Dict[Displayable, DataSummaryBox] = {}
 
         self._init_playlist_view()
 
@@ -60,12 +64,19 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self.playlists, show_details_cmds, pause_cmds,
             resume_cmds, are_pausable, are_resumable)
 
+        for pl, view in zip(self.playlists, self.visible_playlists):
+            if self.playlist_mgr.is_playlist_removable(pl):
+                view.add_menu_item(
+                    self._DELETE_PL_MENU_NAME,
+                    self._get_playlist_delete_cmd(pl))
+
         self.visible_items = self.visible_playlists
 
         self.view.show_all(self.visible_items)
 
     def _show_playlist_details(self, playlist: Playlist):
         self.view = DataSummaryBox(self._BOX_WIDTH, self._BOX_HEIGHT)
+        self.displayable_to_summary_box[playlist] = self.view
         self.view.set_scrollable_size(
             DataListItem.HEIGHT * len(playlist.links))
 
@@ -95,7 +106,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             (self.displayed_playlist, self.visible_items))
 
     def playlist_added(self, playlist: Playlist):
-        self.playlists = [playlist, *self.visible_playlists]  # TODO
+        self.playlists = [playlist, *self.playlists]
 
         dl_item = playlist.to_data_list_item(
             self._get_playlist_details_cmd(playlist),
@@ -103,6 +114,10 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self._get_playlist_resume_cmd(playlist),
             self.playlist_mgr.is_playlist_pausable(playlist),
             self.playlist_mgr.is_playlist_resumable(playlist))
+
+        dl_item.add_menu_item(
+            self._DELETE_PL_MENU_NAME,
+            self._get_playlist_delete_cmd(playlist))
 
         self.displayable_to_view[playlist] = dl_item
 
@@ -118,11 +133,13 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
             self._show_playlist_details(playlist)
 
         self._set_pausable(playlist, True)
+        self._set_removable(playlist, True)
         self.displayable_to_view[playlist].set_size(playlist.get_size())
 
     def playlist_dl_started(self, playlist: Playlist):
         self._update_status(playlist)
         self._set_pausable(playlist, True)
+        self._set_removable(playlist, False)
 
     def link_dl_started(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
@@ -184,6 +201,9 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def _get_link_resume_cmd(self, link: PlaylistLink) -> Command:
         return CallRcvrCommand(self.playlist_mgr.on_link_resume_requested, link)
 
+    def _get_playlist_delete_cmd(self, playlist: Playlist) -> Command:
+        return CallRcvrCommand(self.playlist_mgr.delete_playlist, playlist)
+
     def on_changed_back(self):
         self.displayed_playlist, self.visible_items = self.displayed_items_stack.pop()
 
@@ -218,6 +238,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def playlist_finished(self, playlist: Playlist):
         self._update_status(playlist)
         self._set_pausable(playlist, False)
+        self._set_removable(playlist, True)
 
     def playlist_link_resume_requested(self, playlist_link: PlaylistLink):
         self._set_resumable(playlist_link, False)
@@ -230,6 +251,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
 
     def playlist_resume_requested(self, playlist: Playlist):
         self._set_resumable(playlist, False)
+        self._set_removable(playlist, False)
 
     def playlist_link_paused(self, playlist_link: PlaylistLink):
         self._update_status(playlist_link)
@@ -238,6 +260,18 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def playlist_paused(self, playlist: Playlist):
         self._update_status(playlist)
         self._set_resumable(playlist, True)
+        self._set_removable(playlist, True)
+
+    def _set_removable(self, playlist: Playlist, removable: bool):
+        try:
+            item = self.displayable_to_view[playlist]
+            if removable:
+                item.add_menu_item(self._DELETE_PL_MENU_NAME,
+                                   self._get_playlist_delete_cmd(playlist))
+            else:
+                item.remove_menu_item(self._DELETE_PL_MENU_NAME)
+        except KeyError:
+            pass
 
     def _set_pausable(self, item: Displayable, pausable: bool):
         try:
@@ -265,3 +299,17 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         self._update_status(playlist)
         self._update_link_progress(playlist_link)
         self._update_pl_progress(playlist)
+
+    def playlist_deleted(self, playlist: Playlist):
+        self.playlists.remove(playlist)
+        view = self.displayable_to_view.pop(playlist)
+        self.playlist_view.delete_item(view)
+        self.visible_playlists.remove(view)
+
+        for link in playlist.links:
+            if link in self.displayable_to_view:
+                self.displayable_to_view.pop(link)
+
+        if playlist in self.displayable_to_summary_box:
+            box = self.displayable_to_summary_box.pop(playlist)
+            self.view_changer.view_deleted(box)

@@ -28,8 +28,7 @@ class MainWindowController(DataViewChanger):
 
         self.data_view_changed_observers: List[ViewChangedObserver] = [
             self.data_summary_ctl]
-        self.app_closed_observers: List[AppClosedObserver] = [
-            self.db]
+        self.app_closed_observers: List[AppClosedObserver] = []
 
     def add_app_closed_observer(self, obs: AppClosedObserver):
         self.app_closed_observers.append(obs)
@@ -68,3 +67,7 @@ class MainWindowController(DataViewChanger):
     def _on_window_closed(self):
         for obs in self.app_closed_observers:
             obs.on_app_closed()
+
+    def view_deleted(self, view: DataSummaryBox):
+        # nothing todo as long as change forward doesnt work
+        pass

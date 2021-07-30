@@ -58,3 +58,7 @@ class DBHandler(AppClosedObserver):
     def on_app_closed(self):
         self.session.commit()
         self.session.close()
+
+    def delete_playlist(self, playlist: Playlist):
+        self.session.delete(playlist)
+        self.commit()

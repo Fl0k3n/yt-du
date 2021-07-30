@@ -35,6 +35,10 @@ class DataSummaryBox(QFrame):
         # TODO
         self.show_all([item, *self.visible_widgets])
 
+    def delete_item(self, item: DataListItem):
+        # TODO
+        self.show_all([x for x in self.visible_widgets if x != item])
+
     def set_scrollable_size(self, size: int):
         self.inner_widget.setMinimumHeight(size)
 

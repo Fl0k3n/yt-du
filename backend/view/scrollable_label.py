@@ -13,3 +13,6 @@ class ScrollableLabel(QScrollArea):
     def setText(self, text: str):
         self.label = QLabel(text)
         self.setWidget(self.label)
+
+    def text(self) -> str:
+        return self.label.text()

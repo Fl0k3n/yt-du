@@ -9,7 +9,7 @@ class OptionsBox(QFrame):
 
         self.layout = QVBoxLayout(self)
 
-        self.add_playlist_btn = QPushButton("Add Playlist")
+        self.add_playlist_btn = QPushButton("Download")
         self.layout.addWidget(self.add_playlist_btn)
 
         self.add_playlist_btn.clicked.connect(

@@ -2,10 +2,16 @@
 Module is independant of any external modules (excluding standard ones listed below),
 when used from another script user should create YTDownloader instance
 with appropriate StatusObserver instance for communication.
-Then download method should be called.
+Then download method should be called. If download should be resumed, user 
+has to provide appropriate Resumer object. If link has expired and at least 1 renewed 
+media link is inconsistent entire data will be cleaned up and process will abort,
+user should restart process with renewed data links.
 
 Downloader downloads passed media links in separate threads, then merges them
 using ffmpeg subprocess, stderr of ffmpeg can be obtained.
+
+Requirement: ffmpeg version 4.2.4 (not tested with other)
+OS: Unix only (tested on Ubuntu 20.04)
 """
 import sys
 import re
@@ -92,6 +98,7 @@ class StatusObserver(ABC):
 
     @abstractmethod
     def thread_started(self):
+        """By default thread doesnt allow exit"""
         pass
 
     @abstractmethod
@@ -257,7 +264,8 @@ class ClenMediaURL(MediaURL):
     """
 
     # bytes, yt throttles chunks > 10MB (MB instead of MiB for safety) with this format
-    _MAX_CHUNK_SIZE = 10 * 1000 * 1000 - 1
+    # for now 2MB is used for better responsiveness
+    _MAX_CHUNK_SIZE = 2 * 1000 * 1000 - 1
     _REQ_PARAMS = ['clen', 'mime', 'expire', 'range']
 
     def __init__(self, url: str, resumed: bool = False):
@@ -358,6 +366,7 @@ class SegmentedMediaURL(MediaURL):
         self.fetch_retries = fetch_retries
         self.retry_timeout = retry_timeout
 
+        self.tried_following_redirect = False
         self.seg_count = None
         self.seg_sizes = None
         query = parse.urlparse(self.url).query
@@ -403,7 +412,17 @@ class SegmentedMediaURL(MediaURL):
             resp = self._try_request(requests.get,
                                      first_link, timeout=self.retry_timeout)
             seg_re = r'Segment-Count: (\d+)'
-            self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
+            try:
+                self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
+            except AttributeError:  # redirected most likely
+                if self.tried_following_redirect:
+                    raise  # stop infinite recursion
+
+                hdrs = resp.headers
+                if hdrs['Content-Type'] == 'text/plain' and resp.text.startswith('https'):
+                    self.url = resp.text
+                    self.tried_following_redirect = True
+                    return self._get_seg_count()
 
         return self.seg_count
 
@@ -867,6 +886,7 @@ class YTDownloader:
             # possible race condition if called after
             if self.status_obs is not None:
                 self.status_obs.thread_started()
+                self.status_obs.allow_exit()
             thread.start()
 
         t_start = time.time()

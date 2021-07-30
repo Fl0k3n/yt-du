@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Dict, Iterable
 from backend.utils.util import open_dir_in_explorer
 from PyQt5.QtCore import Qt
 from backend.utils.commands.command import CallRcvrCommand, Command
@@ -38,6 +38,8 @@ class DataListItem(QFrame):
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedSize(150, 30)
+
+        self.extra_menu_actions: Dict[str, QAction] = {}
 
         self._create_menu()
 
@@ -80,6 +82,15 @@ class DataListItem(QFrame):
         act = self.menu.addAction(text)
         act.triggered.connect(lambda: cmd.execute())
         return act
+
+    def add_menu_item(self, text: str, cmd: Command) -> QAction:
+        if text not in self.extra_menu_actions:
+            self.extra_menu_actions[text] = self._create_action(text, cmd)
+
+    def remove_menu_item(self, text: str):
+        if text in self.extra_menu_actions:
+            act = self.extra_menu_actions.pop(text)
+            self.menu.removeAction(act)
 
     def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
         if a0.buttons() == Qt.RightButton:

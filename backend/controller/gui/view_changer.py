@@ -14,3 +14,7 @@ class DataViewChanger(ABC):
     @abstractmethod
     def change_forward(self):
         pass
+
+    @abstractmethod
+    def view_deleted(self, view: DataSummaryBox):
+        pass

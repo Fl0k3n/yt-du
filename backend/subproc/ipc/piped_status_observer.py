@@ -18,7 +18,7 @@ class PipedStatusObserver(StatusObserver):
         self.exit_lock = threading.Lock()
         self.exit_allowed_cond = threading.Condition(self.exit_lock)
         self.thread_count = 1  # excluding listener thread of this class
-        self.exit_allowed_by = 1
+        self.exit_allowed_by = 0
         self.exiting = False
 
         self.child_pids: Set[int] = set()
@@ -96,15 +96,17 @@ class PipedStatusObserver(StatusObserver):
         while True:
             msg = self.msger.recv(self.conn)
             if msg.code == DlCodes.TERMINATE:
+                print('GOT TERMINATE MSG')
                 with self.exit_lock:
                     while self.exit_allowed_by < self.thread_count:
                         self.exit_allowed_cond.wait()
                     self.exiting = True
 
-                with self.children_lock:
-                    for pid in self.child_pids:
-                        os.kill(pid, SIGINT)
-                    os._exit(0)  # TODO maybe use another exit method
+                    with self.children_lock:
+                        for pid in self.child_pids:
+                            os.kill(pid, SIGINT)
+                        print('EXITING!!!!!!!')
+                        os._exit(0)  # TODO maybe use another exit method
             elif msg.code == DlCodes.DL_PERMISSION:
                 with self.permission_lock:
                     link_idx, perm = msg.data

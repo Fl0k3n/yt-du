@@ -73,7 +73,7 @@ class IPCListener(QObject):
 
 class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver):
     # if after this #seconds child is still alive, it will rcv SIGKILL (or mp equivalent)
-    _KILL_CHILDREN_TIMEOUT = 1
+    _KILL_CHILDREN_TIMEOUT = 5
     # non blocking join is issued after this #seconds
     _JOIN_CHILDREN_TIMEOUT = 1
 

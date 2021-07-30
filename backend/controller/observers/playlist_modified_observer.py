@@ -68,3 +68,7 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
     @abstractmethod
     def inconsistenty_fixed(self, playlist_link: PlaylistLink):
         pass
+
+    @abstractmethod
+    def playlist_deleted(self, playlist: Playlist):
+        pass

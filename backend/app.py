@@ -26,6 +26,7 @@ class App(QApplication):
         self.main_window = MainWindowController(self.playlist_manager, self.db)
         self.main_window.add_app_closed_observer(self.ipc_manager)
         self.main_window.add_app_closed_observer(self.speedo)
+        self.main_window.add_app_closed_observer(self.playlist_manager)
 
     def run(self):
         self.main_window.show()
