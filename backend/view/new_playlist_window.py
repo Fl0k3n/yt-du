@@ -42,9 +42,9 @@ class NewPlaylistWindow(QDialog):
         path_btn.clicked.connect(self._open_file_explorer)
 
         # OWN
-        self.url_input.setText(
-            'https://www.youtube.com/watch?v=8xH0sdjMINY&list=PL-wtbH6CyQQZIkOpf2yWjfp_EL9R52olh&index=1')
-        self.name_input.setText('OWN TEST')
+        # self.url_input.setText(
+        #     'https://www.youtube.com/watch?v=8xH0sdjMINY&list=PL-wtbH6CyQQZIkOpf2yWjfp_EL9R52olh&index=1')
+        # self.name_input.setText('OWN TEST')
         # self.path_input.setText('/home/flok3n/music')
 
         btn_box = QWidget()

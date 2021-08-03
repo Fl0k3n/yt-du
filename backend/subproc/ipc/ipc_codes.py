@@ -32,7 +32,7 @@ class DlCodes(Enum):
     CAN_PROCEED_DL = 3
     # data: tuple(int, bool) = (link_id, whether dl can be proceeded)
     DL_PERMISSION = 4
-    # data: tuple(int, int, str) = (index of data link, bytes dl'ed, chunk_url)
+    # data: tuple(int, int, int, str) = (index of data link, expected bytes to dl, bytes dl'ed, chunk_url)
     CHUNK_FETCHED = 5
     # data: int = index of data link
     DL_FINISHED = 6

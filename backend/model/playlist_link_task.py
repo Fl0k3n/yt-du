@@ -29,10 +29,15 @@ class PlaylistLinkTask(DlTask):
         data_link = self.data_links[link_idx]
         return self.pl_dl_mgr.can_proceed_dl(self.playlist_link, data_link)
 
-    def chunk_fetched(self, link_idx: int, bytes_fetched: int, chunk_url: str):
+    def chunk_fetched(self, link_idx: int, expected_bytes_to_fetch: int,
+                      bytes_fetched: int, chunk_url: str):
         data_link = self.data_links[link_idx]
         self.pl_dl_mgr.on_dl_progress(
-            self.playlist_link, data_link, bytes_fetched, chunk_url)
+            self.playlist_link,
+            data_link,
+            expected_bytes_to_fetch,
+            bytes_fetched,
+            chunk_url)
 
     def dl_finished(self, link_idx: int):
         data_link = self.data_links[link_idx]

@@ -47,7 +47,8 @@ class DlTask(ABC):
         pass
 
     @abstractmethod
-    def chunk_fetched(self, link_idx: int, bytes_fetched: int, chunk_url: str):
+    def chunk_fetched(self, link_idx: int, expected_bytes_to_fetch: int,
+                      bytes_fetched: int, chunk_url: str):
         pass
 
     @abstractmethod

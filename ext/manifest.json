@@ -21,6 +21,14 @@
             "js": [
                 "content.js"
             ]
+        },
+        {
+            "matches": [
+                "https://studio.youtube.com/*"
+            ],
+            "js": [
+                "uploader.js"
+            ]
         }
     ]
 }

@@ -1,3 +1,4 @@
+import requests
 from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
@@ -14,6 +15,7 @@ from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import MediaURL, create_media_url, UnsupportedURLError
 from backend.controller.link_renewer import LinkRenewer
 import datetime
+import re
 from collections import defaultdict
 
 # TODO destructure it into smaller objects :PPPPP
@@ -182,7 +184,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
     def _create_data_link(self, url) -> DataLink:
         try:
             media_url = create_media_url(url)
-            dl = DataLink(url=url, size=media_url.get_size(),
+            size = media_url.get_size()
+
+            dl = DataLink(url=url, size=size,
                           mime=media_url.get_mime(), expire=media_url.get_expire_time())
             return dl
         except UnsupportedURLError as e:
@@ -194,7 +198,10 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
                            playlist_idx: int = None) -> str:
         dir = Path(directory_path)
 
-        filename = f'{title}.mp4'
+        safe_title = re.sub(r'[^\w\s-]', '', title)
+        safe_title = re.sub(r'[-\s]+', '-', safe_title).strip('-_')[:50]
+
+        filename = f'{safe_title}.mp4'
         if playlist_idx is not None:
             filename = f'{playlist_idx}_{filename}'
 
@@ -257,17 +264,31 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
             self.link_renewer.is_consistent(playlist_link)
 
     def on_dl_progress(self, playlist_link: PlaylistLink,
-                       data_link: DataLink, bytes_fetched: int, chunk_url: str):
+                       data_link: DataLink, expected_bytes_to_fetch: int,
+                       bytes_fetched: int, chunk_url: str):
         if playlist_link.link_id not in self.dled_link_bytes:
             self._cache_dled_link_bytes(playlist_link)
 
         if playlist_link.playlist_id not in self.dled_pl_bytes:
             self._cache_dled_playlist_bytes(playlist_link.playlist)
 
+        # TODO no idea if these checks are needed here B)
+        if playlist_link.link_id not in self.pl_link_sizes:
+            self._cache_link_size(playlist_link)
+
+        if playlist_link.playlist_id not in self.pl_sizes:
+            self._cache_playlist_size(playlist_link.playlist)
+
         self.dled_pl_bytes[playlist_link.playlist_id] += bytes_fetched
         self.dled_link_bytes[playlist_link.link_id] += bytes_fetched
+
+        size_diff = bytes_fetched - expected_bytes_to_fetch
+        self.pl_sizes[playlist_link.playlist_id] += size_diff
+        self.pl_link_sizes[playlist_link.link_id] += size_diff
+
         data_link.downloaded += bytes_fetched
         data_link.last_chunk_url = chunk_url
+        data_link.size += size_diff
 
         self.db.commit()
 
@@ -351,37 +372,63 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
             obs.playlist_link_merging(playlist_link)
 
     def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
-        pass  # TODO create merge data obj and save to db
+        # TODO
+        if status != 0:
+            playlist_link.set_status(DataStatus.ERRORS)
+            self.db.commit()
+            print(f'link {playlist_link.title} | {playlist_link.url} FAILED')
+            print('*'*80)
+            print(stderr)
+            print('*'*80)
 
     def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
         # TODO
-        playlist_link.set_status(DataStatus.FINISHED)
-        playlist_link.cleaned_up = True
-        self.db.commit()
+        old_status = playlist_link.get_status()
 
-        for obs in self.pl_modified_observers:
-            obs.playlist_link_finished(playlist_link)
+        if not success and old_status == DataStatus.WAIT_FOR_MERGE:  # fail on dl stage
+            # TODO
+            print('Failed on dl stage, retrying')
+            for link in playlist_link.links:
+                link.downloaded = 0
+                link.last_chunk_url = None
+                link.path = None
 
-        pl_id = playlist_link.playlist.playlist_id
-        self.pl_tasks[pl_id].pop(playlist_link)
+            self.db.commit()
+            task = self._create_task(playlist_link)
+            task_id = self.ipc_mgr.schedule_dl_task(task)
 
-        playlist = playlist_link.playlist
+            pl_id = playlist_link.playlist_id
+            self.pl_tasks[pl_id][playlist_link] = task_id
+        else:
+            # TODO handle failure on other stage
+            playlist_link.set_status(DataStatus.FINISHED)
+            playlist_link.cleaned_up = True
 
-        if not self.link_renewer.is_consistent(playlist_link):
-            self._handle_inconsistent(playlist_link)
-        elif self._is_playlist_finished(playlist):
-            playlist.set_status(DataStatus.FINISHED)
             self.db.commit()
 
             for obs in self.pl_modified_observers:
-                obs.playlist_finished(playlist)
+                obs.playlist_link_finished(playlist_link)
 
-        elif self._is_playlist_paused(playlist):
-            playlist.set_status(DataStatus.PAUSED)
-            self.db.commit()
+            pl_id = playlist_link.playlist.playlist_id
+            self.pl_tasks[pl_id].pop(playlist_link)
 
-            for obs in self.pl_modified_observers:
-                obs.playlist_paused(playlist)
+            playlist = playlist_link.playlist
+
+            if not self.link_renewer.is_consistent(playlist_link):
+                self._handle_inconsistent(playlist_link)
+            elif self._is_playlist_finished(playlist):
+                playlist.set_status(DataStatus.FINISHED)
+                self.db.commit()
+
+                for obs in self.pl_modified_observers:
+                    obs.playlist_finished(playlist)
+
+            elif self._is_playlist_paused(playlist):
+                playlist.set_status(DataStatus.PAUSED)
+                self.db.commit()
+
+                for obs in self.pl_modified_observers:
+                    obs.playlist_paused(playlist)
 
     def on_process_paused(self, playlist_link: PlaylistLink):
         self.link_pause_requests.remove(playlist_link)
@@ -558,6 +605,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
     def on_app_closed(self):
         for pl in self.get_playlists():
+            # TODO composite pattern or ill puke
             if self.is_playlist_pausable(pl):
                 pl.set_status(DataStatus.PAUSED)
                 for link in pl.links:

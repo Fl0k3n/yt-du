@@ -48,8 +48,9 @@ class PipedStatusObserver(StatusObserver):
     def dl_finished(self, idx: int):
         self._send_dl_msg(DlCodes.DL_FINISHED, idx)
 
-    def chunk_fetched(self, idx: int, bytes_len: int, chunk_link: str):
-        self._send_dl_msg(DlCodes.CHUNK_FETCHED, (idx, bytes_len, chunk_link))
+    def chunk_fetched(self, idx: int, expected_bytes_len: int, bytes_len: int, chunk_link: str):
+        self._send_dl_msg(DlCodes.CHUNK_FETCHED,
+                          (idx, expected_bytes_len, bytes_len, chunk_link))
 
     def can_proceed_dl(self, idx: int) -> bool:
         if self.exiting:

@@ -117,9 +117,10 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
         self.msger.send(conn, resp_msg)
 
     def _on_chunk_fetched(self, dl_data: DlData):
-        link_id, bytes_fetched, chunk_url = dl_data.data
+        link_id, expected_bytes_to_fetch, bytes_fetched, chunk_url = dl_data.data
         task = self._get_task(dl_data)
-        task.chunk_fetched(link_id, bytes_fetched, chunk_url)
+        task.chunk_fetched(link_id, expected_bytes_to_fetch,
+                           bytes_fetched, chunk_url)
 
     def _on_dl_fisnished(self, dl_data: DlData):
         link_id = dl_data.data
@@ -189,7 +190,7 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
                         conn: Connection, task_id: int, is_resumed: bool, resumer: Resumer):
         stat_obs = PipedStatusObserver(conn, task_id, Messenger())
         downloader = YTDownloader(
-            path, url, [dlink1, dlink2], stat_obs, cleanup=True, verbose=False,
+            path, url, [dlink1, dlink2], stat_obs, cleanup=False, verbose=False,
             resumed=is_resumed, resumer=resumer)
         downloader.download()
 

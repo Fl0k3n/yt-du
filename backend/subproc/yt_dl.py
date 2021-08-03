@@ -27,6 +27,7 @@ from enum import Enum
 import time
 from abc import ABC, abstractmethod
 import urllib.parse as parse
+import pprint
 
 
 PARENT_DIR = Path(__file__).parent.absolute()
@@ -63,7 +64,8 @@ class StatusObserver(ABC):
         pass
 
     @abstractmethod
-    def chunk_fetched(self, idx: int, bytes_len: int, chunk_url: str):
+    def chunk_fetched(self, idx: int, expected_bytes_len: int,
+                      bytes_len: int, chunk_url: str):
         pass
 
     @abstractmethod
@@ -201,6 +203,7 @@ class MediaURL(ABC):
 
     @abstractmethod
     def generate_chunk_urls(self) -> Generator[Tuple[str, int], None, None]:
+        """Yields pairs of chunk_url, expected chunk_size (bytes)"""
         pass
 
     @abstractmethod
@@ -228,10 +231,15 @@ class MediaURL(ABC):
             last_successful = self.url
 
         self.expire = renewed_url.get_expire_time()
-        size = renewed_url.get_size()
 
-        if size != self.get_size():
-            raise UnsupportedURLError(url, msg='Sizes do not match')
+        # TODO large segmented urls might fail here, need other methods
+        # size = renewed_url.get_size()
+
+        # if size != self.get_size():
+        #     raise UnsupportedURLError(url, msg='Sizes do not match')
+
+        # TODO use ffprobe to get resolution and other such data
+        # would require saving it for previous url in the first place
 
         old_state_params = self._get_query_params(last_successful)
         try:
@@ -358,9 +366,12 @@ class SegmentedMediaURL(MediaURL):
     """
     _REQ_PARAMS = ['sq', 'mime', 'expire']
     _MAX_SIZE_FETCHING_THREADS = 10
+    # If video has more than that segments
+    # fetching will take too much time TODO get rid of it totally?
+    _MAX_SEGMENTS_TO_FETCH_SIZE = 50
 
     def __init__(self, url: str, size: int = None,
-                 fetch_retries: int = 5, retry_timeout: int = 0.5, resumed: bool = False):
+                 fetch_retries: int = 15, retry_timeout: int = 0.5, resumed: bool = False):
         super().__init__(url=url, resumed=resumed)
         self.size = size
         self.fetch_retries = fetch_retries
@@ -377,6 +388,10 @@ class SegmentedMediaURL(MediaURL):
         except (KeyError, TypeError) as e:
             raise UnsupportedURLError(self.url, str(e),
                                       msg=f"Failed to build {type(self)} url.")
+
+    def _get_expected_chunk_size(self) -> int:
+        # TODO, based on quality or mean of first couple
+        return 150000
 
     def _init_size_thread_pool(self):
         self.task_queue = Queue()
@@ -465,13 +480,16 @@ class SegmentedMediaURL(MediaURL):
 
     def _get_seg_sizes(self) -> Iterable[int]:
         if self.seg_sizes is None:
-            self._init_size_thread_pool()
-            for thread in self.threads:
-                thread.start()
+            if self._get_seg_count() < self._MAX_SEGMENTS_TO_FETCH_SIZE:
+                self._init_size_thread_pool()
+                for thread in self.threads:
+                    thread.start()
 
-            for thread in self.threads:
-                thread.join()
-
+                for thread in self.threads:
+                    thread.join()
+            else:
+                self.seg_sizes = [
+                    self._get_expected_chunk_size()] * self._get_seg_count()
         return self.seg_sizes
 
     def _get_size(self) -> int:
@@ -693,7 +711,7 @@ class YTDownloader:
             # raw 'for loop' so generator can be changed during iteration
             while True:
                 try:
-                    i, (chunk_link, chunk_size) = next(chunk_gen)
+                    i, (chunk_link, expected_chunk_size) = next(chunk_gen)
                 except StopIteration:
                     break
 
@@ -746,9 +764,11 @@ class YTDownloader:
 
                         f.flush()
 
+                        chunk_size = int(r.headers['Content-Length'])
+
                         if self.status_obs is not None:
                             self.status_obs.chunk_fetched(
-                                idx, chunk_size, chunk_link)
+                                idx, expected_chunk_size, chunk_size, chunk_link)
                             self.status_obs.allow_exit()
 
                         last_successful = chunk_link
