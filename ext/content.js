@@ -9,7 +9,7 @@ chrome.runtime.onMessage.addListener((req, sender, resp) => {
         const hrefs = [...aTags].map(el => el.href);
         if (!hrefs || hrefs.length === 0) {
             if (--MAX_RETRIES > 0)
-                setTimeout(getEm, 1000);
+                setTimeout(getEm, 500);
             else
                 chrome.runtime.sendMessage({ ...req, success: false, reason: 'Failed to get playlist links' });
         }
@@ -23,5 +23,5 @@ chrome.runtime.onMessage.addListener((req, sender, resp) => {
                 , success: true
             });
         }
-    }, 1000);
+    }, 500);
 });
