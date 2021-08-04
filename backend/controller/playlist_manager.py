@@ -1,4 +1,4 @@
-import requests
+from backend.controller.link_created_observer import LinkCreatedObserver
 from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
@@ -12,7 +12,8 @@ from backend.model.db_models import DataLink, Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
-from backend.subproc.yt_dl import MediaURL, create_media_url, UnsupportedURLError
+from backend.subproc.yt_dl import UnsupportedURLError
+from backend.controller.link_creator import LinkCreator
 from backend.controller.link_renewer import LinkRenewer
 import datetime
 import re
@@ -21,14 +22,18 @@ from collections import defaultdict
 # TODO destructure it into smaller objects :PPPPP
 
 
-class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObserver):
-    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo, link_renewer: LinkRenewer):
+class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObserver, LinkCreatedObserver):
+    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo,
+                 link_renewer: LinkRenewer, link_creator: LinkCreator):
         self.db = db
         self.ipc_mgr = ipc_mgr
         self.speedo = speedo
         self.link_renewer = link_renewer
+        self.link_creator = link_creator
 
+        self.link_creator.add_link_created_observer(self)
         self.ipc_mgr.add_playlist_fetched_observer(self)
+
         self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
         # playlist_url -> idx in list above
         self.pl_url_map: Dict[str, int] = {}
@@ -128,18 +133,22 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
                             links: Iterable[str],
                             titles: Iterable[str],
                             data_links: Iterable[Iterable[str]]):
+        # TODO since creation of data link (segmented) may be time consuming
+        # this should be created from separate thread
 
         playlist = self.get_playlist(id=playlist_id)
+        self.pl_sizes[playlist_id] = 0
+        self.dled_pl_bytes[playlist_id] = 0
+        self.pl_tasks[playlist_id] = {}
+
         if playlist in self.deleted_while_fetching:
             self.deleted_while_fetching.remove(playlist)
             return
 
         playlist.set_status(DataStatus.WAIT_FOR_DL)
-        link_task_ids = {}
-        link_sizes = []
         pl_links = []
 
-        for idx, link, title, dlinks in zip(playlist_idxs, links, titles, data_links):
+        for idx, link, title in zip(playlist_idxs, links, titles):
             path = self._create_video_path(
                 playlist.directory_path, title, idx)
 
@@ -149,50 +158,30 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
             pl_link.set_status(DataStatus.WAIT_FOR_DL)
             pl_links.append(pl_link)
             pl_link.playlist = playlist
+            pl_link.playlist_id = playlist_id
             playlist.links.append(pl_link)
             self.db.add_pl_link(pl_link)
 
-            size = 0
-            for dlink in dlinks:
-                dl = self._create_data_link(dlink)
-                self.db.add_data_link(dl)
-                dl.link = pl_link
-                pl_link.data_links.append(dl)
-                size += dl.size
-
-            link_sizes.append(size)
-
         self.db.commit()
 
-        for link, size in zip(pl_links, link_sizes):
-            self.pl_link_sizes[link.link_id] = size
-            self.dled_link_bytes[link.link_id] = 0
+        for pl_link, dlinks in zip(pl_links, data_links):
+            self.link_creator.add_playlist_link(pl_link, dlinks)
 
-        self.pl_sizes[playlist.playlist_id] = sum(link_sizes)
-        self.dled_pl_bytes[playlist.playlist_id] = 0
+    def on_link_created(self, playlist_link: PlaylistLink, playlist_rdy: bool):
+        size = playlist_link.get_size_bytes()
+        self.pl_link_sizes[playlist_link.link_id] = size
+        self.dled_link_bytes[playlist_link.link_id] = 0
+        playlist_id = playlist_link.playlist_id
 
-        for pl_link in pl_links:
-            task = self._create_task(pl_link)
-            task_id = self.ipc_mgr.schedule_dl_task(task)
-            link_task_ids[pl_link] = task_id
+        self.pl_sizes[playlist_id] += size
 
-        for obs in self.pl_modified_observers:
-            obs.playlist_links_added(playlist)
+        task = self._create_task(playlist_link)
+        task_id = self.ipc_mgr.schedule_dl_task(task)
+        self.pl_tasks[playlist_id][playlist_link] = task_id
 
-        self.pl_tasks[playlist_id] = link_task_ids
-
-    def _create_data_link(self, url) -> DataLink:
-        try:
-            media_url = create_media_url(url)
-            size = media_url.get_size()
-
-            dl = DataLink(url=url, size=size,
-                          mime=media_url.get_mime(), expire=media_url.get_expire_time())
-            return dl
-        except UnsupportedURLError as e:
-            print(e)
-            exit(2)
-            # TODO handle it
+        if playlist_rdy:
+            for obs in self.pl_modified_observers:
+                obs.playlist_links_added(playlist_link.playlist)
 
     def _create_video_path(self, directory_path: str, title: str,
                            playlist_idx: int = None) -> str:

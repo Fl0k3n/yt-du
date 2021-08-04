@@ -109,7 +109,6 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
         link_id = dl_data.data
         task = self._get_task(dl_data)
         permission = task.dl_permission_requested(link_id)
-        print('SENDING PERMISSION: ', permission)
 
         conn = self.connections[dl_data.task_id]
         resp_msg = Message(DlCodes.DL_PERMISSION, (link_id, permission))

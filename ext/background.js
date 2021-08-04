@@ -1,7 +1,9 @@
 console.log('Working');
 
 const PORT = 5555;
-const HREFS_CODE = 1;
+
+const HREFS_CODE = 1; // match with content.js codes
+
 const connTimeout = 5; // seconds
 let retries = 10;
 let connEstb = false;
@@ -24,7 +26,7 @@ const CODES = {
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5589, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = 5562, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;

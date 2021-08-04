@@ -1,3 +1,4 @@
+from backend.controller.link_creator import LinkCreator
 from backend.controller.link_renewer import LinkRenewer
 from backend.controller.speedo import Speedo
 import sys
@@ -16,17 +17,18 @@ class App(QApplication):
         self.ipc_manager = IPCManager()
         self.speedo = Speedo()
         self.link_renewer = LinkRenewer(self.ipc_manager, self.db)
+        self.link_creator = LinkCreator(self.db)
 
         self.db.connect()
         self.playlist_manager = PlaylistManager(
-            self.db, self.ipc_manager, self.speedo, self.link_renewer)
+            self.db, self.ipc_manager, self.speedo,
+            self.link_renewer, self.link_creator)
 
         self.ipc_manager.add_link_fetched_observer(self.link_renewer)
 
         self.main_window = MainWindowController(self.playlist_manager, self.db)
-        self.main_window.add_app_closed_observer(self.ipc_manager)
-        self.main_window.add_app_closed_observer(self.speedo)
-        self.main_window.add_app_closed_observer(self.playlist_manager)
+        for obs in [self.ipc_manager, self.speedo, self.playlist_manager, self.link_creator]:
+            self.main_window.add_app_closed_observer(obs)
 
     def run(self):
         self.main_window.show()

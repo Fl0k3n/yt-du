@@ -369,6 +369,7 @@ class SegmentedMediaURL(MediaURL):
     # If video has more than that segments
     # fetching will take too much time TODO get rid of it totally?
     _MAX_SEGMENTS_TO_FETCH_SIZE = 50
+    _MAX_REDIRECTS = 10
 
     def __init__(self, url: str, size: int = None,
                  fetch_retries: int = 15, retry_timeout: int = 0.5, resumed: bool = False):
@@ -377,7 +378,7 @@ class SegmentedMediaURL(MediaURL):
         self.fetch_retries = fetch_retries
         self.retry_timeout = retry_timeout
 
-        self.tried_following_redirect = False
+        self.redirected_count = 0
         self.seg_count = None
         self.seg_sizes = None
         query = parse.urlparse(self.url).query
@@ -430,13 +431,13 @@ class SegmentedMediaURL(MediaURL):
             try:
                 self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
             except AttributeError:  # redirected most likely
-                if self.tried_following_redirect:
+                if self.redirected_count == self._MAX_REDIRECTS:
                     raise  # stop infinite recursion
 
                 hdrs = resp.headers
                 if hdrs['Content-Type'] == 'text/plain' and resp.text.startswith('https'):
                     self.url = resp.text
-                    self.tried_following_redirect = True
+                    self.redirected_count += 1
                     return self._get_seg_count()
 
         return self.seg_count

@@ -35,7 +35,13 @@ async function setSettings(vis = 'PRIVATE') {
         box.classList.remove('row-selected');
 
         setTimeout(async function retry() {
-            if (document.querySelector('ytcp-uploads-dialog') == null)
+            const d1 = document.querySelectorAll('ytcp-dialog.ytcp-uploads-still-processing-dialog');
+            if (d1 != null) {
+                d1.querySelector('#close-button').click();
+            }
+            const d2 = document.querySelector('ytcp-uploads-dialog');
+
+            if (d1 == null && d2 == null)
                 await setSettings(vis);
             else
                 setTimeout(retry, 100);
@@ -60,6 +66,7 @@ async function addButton() {
             border-radius: 50%;
             width: 60px;
             height: 60px;
+            z-index: 1000000;
         }
 
         #_my-upload-btn:hover {
@@ -75,7 +82,8 @@ async function addButton() {
     parent.appendChild(btn);
 
     btn.textContent = 'Fast upload';
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         await setSettings();
     });
 }
