@@ -175,13 +175,16 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
         self.pl_sizes[playlist_id] += size
 
-        task = self._create_task(playlist_link)
-        task_id = self.ipc_mgr.schedule_dl_task(task)
-        self.pl_tasks[playlist_id][playlist_link] = task_id
-
         if playlist_rdy:
+            playlist = playlist_link.playlist
+
             for obs in self.pl_modified_observers:
-                obs.playlist_links_added(playlist_link.playlist)
+                obs.playlist_links_added(playlist)
+
+            for pl_link in playlist.links:
+                task = self._create_task(pl_link)
+                task_id = self.ipc_mgr.schedule_dl_task(task)
+                self.pl_tasks[playlist_id][pl_link] = task_id
 
     def _create_video_path(self, directory_path: str, title: str,
                            playlist_idx: int = None) -> str:
@@ -420,12 +423,20 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
                     obs.playlist_paused(playlist)
 
     def on_process_paused(self, playlist_link: PlaylistLink):
+        self.pl_tasks[playlist_link.playlist.playlist_id].pop(playlist_link)
+        self.link_dling_count.pop(playlist_link.link_id)
+        self._playlist_link_paused(playlist_link)
+
+        playlist = playlist_link.playlist
+
+        if self._is_playlist_paused(playlist):
+            self.pl_dling_count.pop(playlist.playlist_id)
+            self.speedo.dl_stopped(playlist)
+
+    def _playlist_link_paused(self, playlist_link: PlaylistLink):
         self.link_pause_requests.remove(playlist_link)
         self.pl_links_pause_req_count[playlist_link.playlist] -= 1
-        self.pl_tasks[playlist_link.playlist.playlist_id].pop(playlist_link)
-
         playlist_link.set_status(DataStatus.PAUSED)
-        self.link_dling_count.pop(playlist_link.link_id)
 
         for obs in self.pl_modified_observers:
             obs.playlist_link_paused(playlist_link)
@@ -434,12 +445,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
         if self._is_playlist_paused(playlist):
             playlist.set_status(DataStatus.PAUSED)
-            self.pl_dling_count.pop(playlist.playlist_id)
 
             for obs in self.pl_modified_observers:
                 obs.playlist_paused(playlist)
-
-            self.speedo.dl_stopped(playlist)
 
             try:
                 self.pl_pause_requests.remove(playlist)
@@ -453,18 +461,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
     def on_playlist_pause_requested(self, playlist: Playlist):
         self.pl_pause_requests.add(playlist)
 
-        not_running = []
         for link in self.pl_tasks[playlist.playlist_id].keys():
-            running = self.on_link_pause_requested(link, inner_call=True)
-            if not running:
-                not_running.append(link)
-
-        for link in not_running:
-            link.set_status(DataStatus.PAUSED)
-            for obs in self.pl_modified_observers:
-                obs.playlist_link_paused(link)
-
-        self.db.commit()
+            self.on_link_pause_requested(link, inner_call=True)
 
         for obs in self.pl_modified_observers:
             obs.playlist_pause_requested(playlist)
@@ -473,9 +471,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         task_id = self.pl_tasks[playlist_link.playlist.playlist_id][playlist_link]
         running = self.ipc_mgr.pause_dl(task_id)
 
-        if running:
-            self.pl_links_pause_req_count[playlist_link.playlist] += 1
-            self.link_pause_requests.add(playlist_link)
+        self.pl_links_pause_req_count[playlist_link.playlist] += 1
+        self.link_pause_requests.add(playlist_link)
 
         for obs in self.pl_modified_observers:
             obs.playlist_link_pause_requested(playlist_link)
@@ -484,6 +481,9 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
                 link) for link in playlist_link.playlist.links):
             for obs in self.pl_modified_observers:
                 obs.playlist_pause_requested(playlist_link.playlist)
+
+        if not running:
+            self._playlist_link_paused(playlist_link)
 
         return running
 
@@ -550,6 +550,10 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
         for obs in self.pl_modified_observers:
             obs.playlist_link_resume_requested(playlist_link)
+
+        if self._is_playlist_paused(playlist_link.playlist):
+            for obs in self.pl_modified_observers:
+                obs.playlist_resume_requested(playlist_link.playlist)
 
     def _create_task(self, playlist_link) -> PlaylistLinkTask:
         return PlaylistLinkTask(

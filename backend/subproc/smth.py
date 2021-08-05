@@ -1,4 +1,3 @@
-from pymdeco
 import unicodedata
 import urllib.parse as parse
 from queue import Queue, Empty
@@ -83,26 +82,19 @@ title = 'nirvana'
 playlist_name = 'live love asap'
 path = '/home/flok3n/ytdl'
 
-u1 = 'https://r7---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1628020777&ei=yUsJYcPDGoLxyQX6qbWYAQ&ip=185.25.121.133&id=o-ALOXePx-ewdbeHHdwy85aQQZy28X1V5AQzixf-tKT3uJ&itag=136&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278&source=yt_otf&requiressl=yes&mh=jl&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fe7&ms=au%2Crdu&mv=m&mvi=7&pl=24&initcwndbps=1258750&vprv=1&mime=video%2Fmp4&ns=oDFA3QCogncilTfUeRkue4QG&otf=1&otfp=1&dur=0.000&lmt=1602611999406715&mt=1627999022&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=6210222&n=HIoGa0YhaOBhUg&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAPsL6rTYw0dpSYYSJNLXc8UQWWUbsgSCkeGTlFJBhq6YAiAtQ4ChpXNb7tJqgnf8x2b_E9pFDXrH_Yvwm95DlbCnoA%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAJWD8la6dR3N8MD7lwbmsmkv-iOW49guaNjeb9Dh2E31AiBq96q_0xy-M1cCgX_973W1rgJCF3WLDhC6uAYRF9tZ7w%3D%3D&alr=yes&cpn=lbEqKS53ni--GoUw&cver=2.20210802.00.00&sq=0&rn=1&rbuf=0'
+u1 = 'https://r2---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1628192322&ei=4ukLYaSrJt2RyQWO0qmgBQ&ip=185.25.121.133&id=o-AK8gCLDJ3z546WNemuZDugC2mIbyye802epWlle_spIQ&itag=136&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C278&source=yt_otf&requiressl=yes&mh=gD&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fer&ms=au%2Crdu&mv=m&mvi=2&pcm2cms=yes&pl=24&initcwndbps=1025000&vprv=1&mime=video%2Fmp4&ns=ulSCN9PEf2k1fHKqA_IhCeUG&otf=1&otfp=1&dur=0.000&lmt=1608199223642507&mt=1628170381&fvip=2&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=6210222&n=Tb-eFzJQAnvTWA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAPSTTd551u7M85RqzerfqJkO3DYWM6UTOSxkJWh6Mt79AiAYYksYs52LsWViyKag2qTPQvVsODATf8DjVQVLwo5SuQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAPUQI1WeL8xy6j56ORgFr75E3Ut9VVTZAjXBDlaU-IoNAiB-M5yBa5Akvj-Of0RF_mUx1JilPjDXiKcX-xuBN3h-VQ%3D%3D&alr=yes&cpn=-jcBBiRtoBRzX4VA&cver=2.20210803.09.01&sq=0&rn=1&rbuf=0'
 
-u2 = 'https://r7---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1628020777&ei=yUsJYcPDGoLxyQX6qbWYAQ&ip=185.25.121.133&id=o-ALOXePx-ewdbeHHdwy85aQQZy28X1V5AQzixf-tKT3uJ&itag=251&source=youtube&requiressl=yes&mh=jl&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fe7&ms=au%2Crdu&mv=m&mvi=7&pl=24&initcwndbps=1258750&vprv=1&mime=audio%2Fwebm&ns=oDFA3QCogncilTfUeRkue4QG&gir=yes&clen=72734634&otfp=1&dur=5248.581&lmt=1602612032458842&mt=1627999022&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=6211222&n=HIoGa0YhaOBhUg&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRAIgRVHVghUI9j4lJdG936iQ0rHPww_2Z7V9MY_AxTbv-XACIG-XP2-0UrW31oagx3vRzW4eS8RfCoLO5_MVprs1K4m8&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAJWD8la6dR3N8MD7lwbmsmkv-iOW49guaNjeb9Dh2E31AiBq96q_0xy-M1cCgX_973W1rgJCF3WLDhC6uAYRF9tZ7w%3D%3D&alr=yes&cpn=lbEqKS53ni--GoUw&cver=2.20210802.00.00&range=0-75130&rn=2&rbuf=0'
+u2 = 'https://r2---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1628192322&ei=4ukLYaSrJt2RyQWO0qmgBQ&ip=185.25.121.133&id=o-AK8gCLDJ3z546WNemuZDugC2mIbyye802epWlle_spIQ&itag=251&source=youtube&requiressl=yes&mh=gD&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fer&ms=au%2Crdu&mv=m&mvi=2&pcm2cms=yes&pl=24&initcwndbps=1025000&vprv=1&mime=audio%2Fwebm&ns=ulSCN9PEf2k1fHKqA_IhCeUG&gir=yes&clen=78618607&otfp=1&dur=5536.421&lmt=1608199308469330&mt=1628170381&fvip=2&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=6211222&n=Tb-eFzJQAnvTWA&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cotfp%2Cdur%2Clmt&sig=AOq0QJ8wRQIhAJ1dHJ3yH8jzUM9PWJuYeIyOng8T1TwiDkqRl_RPNYrOAiBlauXXxObwhblixl-NGITixg-NGBLa5Vvej_MaeAxLZQ%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAPUQI1WeL8xy6j56ORgFr75E3Ut9VVTZAjXBDlaU-IoNAiB-M5yBa5Akvj-Of0RF_mUx1JilPjDXiKcX-xuBN3h-VQ%3D%3D&alr=yes&cpn=-jcBBiRtoBRzX4VA&cver=2.20210803.09.01&range=0-75650&rn=2&rbuf=0'
 
-name = 'f4l15h'
+name = 'tw'
 mp4 = f'{path}/{name}.mp4'
 
-# r = requests.get(u1)
-# with open(mp4, 'wb') as f:
-#     for chunk in r.iter_content():
-#         f.write(chunk)
 
-tag = TinyTag.get('/home/flok3n/ytdl/.tmp/2_2340036174898268530_2/1.web')
-print(tag)
-
-# if os.fork() == 0:
-#     os.execlp('python', 'python', './yt_dl.py',
-#               path, link, title, u1, u2)
-# else:
-#     print(os.wait())
+if os.fork() == 0:
+    os.execlp('python', 'python', './yt_dl.py',
+              mp4, link, title, u1, u2)
+else:
+    print(os.wait())
 
 
 # print(requests.get(url, headers={

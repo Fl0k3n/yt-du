@@ -58,7 +58,7 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
         return tid
 
     def _check_queue(self):
-        if self.task_queue and len(self.processes) < self._MAX_BATCH_DL:
+        while self.task_queue and len(self.processes) < self._MAX_BATCH_DL:
             task = self.task_queue.popleft()
             if task not in self.paused_tasks:
                 self._start_download(task)

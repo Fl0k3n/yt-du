@@ -35,7 +35,7 @@ async function setSettings(vis = 'PRIVATE') {
         box.classList.remove('row-selected');
 
         setTimeout(async function retry() {
-            const d1 = document.querySelectorAll('ytcp-dialog.ytcp-uploads-still-processing-dialog');
+            const d1 = document.querySelector('ytcp-dialog.ytcp-uploads-still-processing-dialog');
             if (d1 != null) {
                 d1.querySelector('#close-button').click();
             }

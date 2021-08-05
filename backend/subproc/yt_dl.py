@@ -12,6 +12,7 @@ using ffmpeg subprocess, stderr of ffmpeg can be obtained.
 
 Requirement: ffmpeg version 4.2.4 (not tested with other)
 OS: Unix only (tested on Ubuntu 20.04)
+Python: 3.8.10
 """
 import sys
 import re
@@ -27,7 +28,6 @@ from enum import Enum
 import time
 from abc import ABC, abstractmethod
 import urllib.parse as parse
-import pprint
 
 
 PARENT_DIR = Path(__file__).parent.absolute()
@@ -161,6 +161,14 @@ class Resumer(ABC):
     def should_resume_download(self) -> bool:
         pass
 
+    @abstractmethod
+    def is_resumed(self, url: str) -> bool:
+        pass
+
+    @abstractmethod
+    def set_resumed(self, url: str):
+        pass
+
 
 class UnsupportedURLError(Exception):
     """Raised when url couldn't have been parsed for downloading"""
@@ -180,9 +188,12 @@ class UnsupportedURLError(Exception):
 class MediaURL(ABC):
     """If getting parameter requires extra work lazy init will be used"""
 
-    def __init__(self, url: str, resumed: bool = False):
+    def __init__(self, url: str, resumed: bool = False,
+                 fetch_retries: int = 25, retry_timeout: float = 1):
         self.url = url
         self.resumed = resumed
+        self.fetch_retries = fetch_retries
+        self.retry_timeout = retry_timeout
 
     @abstractmethod
     def get_size(self) -> int:
@@ -263,6 +274,16 @@ class MediaURL(ABC):
         pass
 
 
+def try_request(retries, func, *args, **kwargs):
+    for _ in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except (ConnectionError, requests.exceptions.Timeout):
+            pass
+
+    raise ConnectionError('Failed to execute ', repr(func), 'with args', args)
+
+
 class ClenMediaURL(MediaURL):
     """representing urls of form:
     https://r7---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627070421&ei=dcv6YJvXKZX5yQXW2pi4Cg&ip=185.25.121.191&id=o-AHkkLgbS2OUlsLPM2v8g0ZkUUXZFXCDjKKcyI1zCYWE3&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C271%2C278%2C313%2C394%2C395%2C396%2C397%2C398%2C399%2C400%2C401&source=youtube&requiressl=yes&mh=wH&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=7&pl=24&initcwndbps=1245000&vprv=1&mime=video%2Fmp4&ns=4afvKawWCex7rzulWwKQk3oG&gir=yes&clen=32646474&dur=187.000&lmt=1627006227864114&mt=1627048609&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=PcE-xKRRjcreiA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRAIgdpEbK0XRz4Tt0zd1I4vhVHjOkS7OHaUx4m0-L7zjeScCIG6jwBUH7LVtGMCITc5zIaiMJx4vcAVclta5lQ8OYWa9&alr=yes&sig=AOq0QJ8wRQIhAK_Ktkbx3fx25Hd6qPRNJPucN-3jZXKgWkawTcjzg6lrAiB8uVRvdYmAwuHgbNbDBY5CKfhHVr2YjPmijy_H8xM-xw%3D%3D&cpn=LOfyYmu4lqM5ET_o&cver=2.20210721.00.00&range=0-489233&rn=1&rbuf=0
@@ -275,9 +296,13 @@ class ClenMediaURL(MediaURL):
     # for now 2MB is used for better responsiveness
     _MAX_CHUNK_SIZE = 2 * 1000 * 1000 - 1
     _REQ_PARAMS = ['clen', 'mime', 'expire', 'range']
+    _MAX_REDIRECTS = 10
 
-    def __init__(self, url: str, resumed: bool = False):
-        super().__init__(url=url, resumed=resumed)
+    def __init__(self, url: str, resumed: bool = False,
+                 fetch_retries: int = 25, retry_timeout: float = 1):
+        super().__init__(url=url, resumed=resumed,
+                         fetch_retries=fetch_retries, retry_timeout=retry_timeout)
+
         params = self._get_query_params(self.url)
         try:
             self.size = int(params['clen'][0])
@@ -286,6 +311,20 @@ class ClenMediaURL(MediaURL):
         except (KeyError, TypeError) as e:
             raise UnsupportedURLError(self.url, str(e),
                                       msg=f"Failed to build {type(self)} url.")
+
+        if not self.resumed:  # TODO Do it either way?
+            self._fix_redirects()
+
+    def _fix_redirects(self):
+        for _ in range(self._MAX_REDIRECTS):
+            resp = try_request(self.fetch_retries, requests.get,
+                               self.url, self.retry_timeout)
+            hdrs = resp.headers
+            if hdrs['Content-Type'] == 'text/plain' and resp.text.startswith('https'):
+                self.url = resp.text
+            else:
+                break
+            # handle other error codes?
 
     def get_raw_url(self) -> str:
         return self.url
@@ -372,11 +411,10 @@ class SegmentedMediaURL(MediaURL):
     _MAX_REDIRECTS = 10
 
     def __init__(self, url: str, size: int = None,
-                 fetch_retries: int = 15, retry_timeout: int = 0.5, resumed: bool = False):
-        super().__init__(url=url, resumed=resumed)
+                 fetch_retries: int = 25, retry_timeout: float = 1, resumed: bool = False):
+        super().__init__(url=url, resumed=resumed,
+                         fetch_retries=fetch_retries, retry_timeout=retry_timeout)
         self.size = size
-        self.fetch_retries = fetch_retries
-        self.retry_timeout = retry_timeout
 
         self.redirected_count = 0
         self.seg_count = None
@@ -408,15 +446,6 @@ class SegmentedMediaURL(MediaURL):
 
         self.seg_sizes = [None] * self._get_seg_count()
 
-    def _try_request(self, func, *args, **kwargs):
-        for _ in range(self.fetch_retries):
-            try:
-                return func(*args, **kwargs)
-            except (ConnectionError, requests.exceptions.Timeout):
-                pass
-
-        raise ConnectionError('Failed to get segments count')
-
     def _get_seg_count(self) -> int:
         if self.seg_count is None:
             if self.resumed:
@@ -425,8 +454,8 @@ class SegmentedMediaURL(MediaURL):
             else:
                 first_link = self.get_raw_url()
 
-            resp = self._try_request(requests.get,
-                                     first_link, timeout=self.retry_timeout)
+            resp = try_request(self.fetch_retries, requests.get,
+                               first_link, timeout=self.retry_timeout)
             seg_re = r'Segment-Count: (\d+)'
             try:
                 self.seg_count = int(re.search(seg_re, resp.text).group(1)) + 1
@@ -439,6 +468,8 @@ class SegmentedMediaURL(MediaURL):
                     self.url = resp.text
                     self.redirected_count += 1
                     return self._get_seg_count()
+
+                raise
 
         return self.seg_count
 
@@ -473,8 +504,8 @@ class SegmentedMediaURL(MediaURL):
         while True:
             try:
                 idx, url = self.task_queue.get(block=False)
-                resp = self._try_request(
-                    requests.head, url, timeout=self.retry_timeout)
+                resp = try_request(self.fetch_retries,
+                                   requests.head, url, timeout=self.retry_timeout)
                 self.seg_sizes[idx] = int(resp.headers['Content-Length'])
             except Empty:
                 return
@@ -642,7 +673,8 @@ class YTDownloader:
     def _create_media_urls(self):
         try:
             self.media_urls = [create_media_url(
-                url, self.resumed) for url in self.data_links]
+                url, self.resumed and self.resumer.is_resumed(url))
+                for url in self.data_links]
         except UnsupportedURLError as e:
             print(e)
             if self.status_obs is not None:

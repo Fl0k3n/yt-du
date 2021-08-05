@@ -89,7 +89,6 @@ class LinkCreator(AppClosedObserver):
         pl_link = task.pl_link
         dlink = task.dlink
 
-        pl_link.data_links.append(dlink)
         self.db.add_data_link(dlink)
         dlink.link = pl_link
         pl_link.data_links.append(dlink)

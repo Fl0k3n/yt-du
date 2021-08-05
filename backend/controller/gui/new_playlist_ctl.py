@@ -46,11 +46,19 @@ class NewPlaylistController:
         url = self.view.get_url()
         path = self.view.get_path()
 
+        if not url.startswith('http'):
+            print('BAD URL')  # TODO
+            return
+
         out_path = str(Path(path).joinpath(name).absolute())
+
         try:
             os.mkdir(out_path)
         except FileExistsError:
             print('possibly going to overwrite')
+        except Exception as e:
+            print('Failed to create directory', e)
+            return
 
         self._add_playlist(name, url, out_path)
 

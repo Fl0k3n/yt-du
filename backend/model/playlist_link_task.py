@@ -80,6 +80,7 @@ class PlaylistLinkTask(DlTask):
             url = dlink.url
             if dlink.last_chunk_url is not None:
                 url = dlink.last_chunk_url
+                self.resumer.set_resumed(url)
             m_urls.append(url)
 
         return m_urls

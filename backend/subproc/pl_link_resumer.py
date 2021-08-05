@@ -1,8 +1,8 @@
-from backend.model.db_models import PlaylistLink
+from backend.model.db_models import DataLink, PlaylistLink
 from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import Resumer
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Set
 
 
 class PlaylistLinkResumer(Resumer):
@@ -22,6 +22,8 @@ class PlaylistLinkResumer(Resumer):
                                              self.dlink_dled_sizes, self.dlink_sizes)
                                          if dled_size == dlink_size])
 
+        self.resumed_urls: Set[str] = set()
+
     def should_create_tmp_files_dir(self) -> bool:
         return self.tmp_files_dir is None
 
@@ -39,3 +41,9 @@ class PlaylistLinkResumer(Resumer):
 
     def get_finished_dlinks_count(self) -> int:
         return self.finished_dlinks_count
+
+    def set_resumed(self, url: str):
+        self.resumed_urls.add(url)
+
+    def is_resumed(self, url: str) -> bool:
+        return url in self.resumed_urls
