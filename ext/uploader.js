@@ -22,7 +22,7 @@ async function setSettings(vis = 'PRIVATE') {
     try {
         const box = await tryQS('#row-container.row-selected');
         box.querySelector('#video-thumbnail-container').click();
-        const kids = await tryQS('#made-for-kids-group  [name="MADE_FOR_KIDS"]');
+        const kids = await tryQS('.made-for-kids-group  [name="VIDEO_MADE_FOR_KIDS_MFK"]');
         kids.click();
         const btn = document.querySelector('#next-button');
         btn.click(); // details

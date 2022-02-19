@@ -1,4 +1,4 @@
-console.log('Working');
+console.log('YTDU backgroud.js loaded');
 
 const PORT = 5555;
 
@@ -42,8 +42,8 @@ class ConnectionHandler {
 
     init() {
         this.socket = new WebSocket(`ws://127.0.0.1:${this.PORT}`);
-        this.playlistExtractor = new PlaylistLinkExtractor(this);
-        this.LinkExtractor = new LinkExtractor(this);
+        this.linkExtractor = new LinkExtractor(this);
+        this.playlistExtractor = new PlaylistLinkExtractor(this, this.linkExtractor);
 
         this.socket.addEventListener('error', err => this.onError(err));
         this.socket.addEventListener('open', ev => this.onConnected(ev));
@@ -74,7 +74,7 @@ class ConnectionHandler {
         if (code == CODES.FETCH_PLAYLIST)
             this.playlistExtractor.addPlaylist(data['url'], msg_ob);
         else if (code == CODES.FETCH_LINK)
-            this.LinkExtractor.addLink(data['url'], msg_ob);
+            this.linkExtractor.addLink(data['url'], msg_ob, this.sendSingleLink);
         else if (code == CODES.PING)
             this.pingedBack = true;
         else
@@ -171,7 +171,6 @@ class ConnectionHandler {
         this._sendPlaylistData(playlist, code, reason);
     }
 
-    // TODO make it consistent lmao
     sendSingleLink(link, dataLinks, echo) {
         console.log('SENDING SINGLE LINK', link, dataLinks,
             echo, '\n--------------------------');
@@ -187,26 +186,105 @@ class ConnectionHandler {
 }
 
 
-// TODO refactor this class so it uses LinkExtractor
-class PlaylistLinkExtractor {
+class LinkExtractor {
+    // Handles extraction of single link
     constructor(communicationHandler) {
+        this.communicationHandler = communicationHandler;
+
+        // url -> {linksArr: [str], requiredTypes: Set[str], echo: original request, readyCallback: function(link, linksArr, echo))}
+        this.linkMap = new Map();
+        this.tabsMap = new Map(); // tabId -> url
+
+        chrome.webRequest.onCompleted.addListener(details => this._linkIntecepted(details), {
+            urls: ["*://*.googlevideo.com/*"]
+        });
+    }
+
+    addLink(link, echo, readyCallback) {
+        if (this.linkMap.has(link)) {
+            console.log(`link ${link} already enqueued`);
+            return;
+        }
+        this.linkMap.set(link, {
+            linksArr: [],
+            requiredTypes: new Set(['audio', 'video']),
+            echo: echo,
+            readyCallback: readyCallback
+        });
+        this._getDataLinks(link);
+    }
+
+    _getDataLinks(link) {
+        chrome.tabs.create({
+            active: false,
+            url: link
+        }, tab => {
+            this.tabsMap.set(tab.id, link);
+        });
+    }
+
+    _linkIntecepted(details) {
+        const { tabId } = details;
+        const link = this.tabsMap.get(tabId);
+
+        if (link && this._isValid(details.url)) {
+            const { linksArr, requiredTypes } = this.linkMap.get(link);
+            try {
+                const mimesRe = /mime=(\w+)/;
+                const type = details.url.match(mimesRe)[1];
+
+                if (requiredTypes.has(type))
+                    requiredTypes.delete(type);
+                else
+                    return;
+
+                linksArr.push(details.url);
+                // got 2 links (audio + video) this playlist's link is done
+                if (linksArr.length == 2)
+                    this._tabReady(tabId, link);
+            }
+            catch (err) {
+                console.error(`url ${details.url} is invalid`, err);
+                console.log(link);
+            }
+        }
+    }
+
+    _tabReady(tabId, link) {
+        this.tabsMap.delete(tabId);
+        const { linksArr, echo, readyCallback } = this.linkMap.get(link);
+        this.linkMap.delete(link);
+
+        chrome.tabs.remove(tabId);
+        readyCallback(link, linksArr, echo);
+    }
+
+    _isValid(url) {
+        return url.includes('rbuf=0');
+    }
+}
+
+
+
+// handles extraction of links from whole playlist
+class PlaylistLinkExtractor {
+    constructor(communicationHandler, linkExtractor) {
         this.MAX_BATCH_TABS = 5; // if playlist has > 5 links, they will be opened in separete runs
 
         this.playlists = [];
         this.communicationHandler = communicationHandler;
+        this.linkExtractor = linkExtractor;
 
         this.linksMap = new Map();  // playlist(url) -> {links: Map<link_within_playlist, [DataLink]>, waiting: int}
-        this.tabsMap = new Map(); // tabId -> playlist(url)
-        this.tabId2Link = new Map(); // tabId -> link (within playlist)
         this.link2title = new Map(); // link -> video title
 
         // process playlists sequentially not to kill browser
         // this.playlists.forEach(playlist => this.getPlaylistItems(playlist));
 
-        chrome.webRequest.onCompleted.addListener(details => this._linkIntecepted(details), {
-            urls: ["*://*.googlevideo.com/*"]
-        });
+        this.setupLinksExtractedListener();
+    }
 
+    setupLinksExtractedListener() {
         chrome.runtime.onMessage.addListener((req, sender, resp) => {
             if (req && req.code === HREFS_CODE) {
                 if (req.success) {
@@ -269,37 +347,26 @@ class PlaylistLinkExtractor {
         });
     }
 
-    _extractSize(textContent) {
-        const re = /\d+\s\/\s(\d+)/;
-        const matches = textContent.match(re);
-        if (!matches || matches.length < 2)
-            throw new Error(`Failed to extract playlist size from ${textContent}`);
-        return parseInt(matches[1]);
-    }
 
     _openPlaylistTabs(playlistUrl, urls) {
         const data = this.linksMap.get(playlistUrl);
 
         urls.forEach(url => {
             data.waiting++;
-            chrome.tabs.create({
-                active: false,
-                url: url
-            }, tab => {
-                this.tabsMap.set(tab.id, playlistUrl);
-                this.tabId2Link.set(tab.id, url);
-                data.links.set(url, {
-                    linksArr: [],
-                    requiredTypes: new Set(['audio', 'video'])
-                });
+            const urlData = {
+                linksArr: []
+            };
+
+            data.links.set(url, urlData);
+
+            this.linkExtractor.addLink(url, null, (link, linksArr, echo) => {
+                urlData.linksArr = linksArr;
+                this._tabReady(playlistUrl, data);
             });
         });
     }
 
-    _tabReady(tabId, playlist, playlistData) {
-        this.tabId2Link.delete(tabId);
-        this.tabsMap.delete(tabId);
-        chrome.tabs.remove(tabId);
+    _tabReady(playlist, playlistData) {
         playlistData.waiting--;
         playlistData.done++;
         const processed = playlistData.waiting + playlistData.done;
@@ -328,144 +395,11 @@ class PlaylistLinkExtractor {
         if (this.playlists.length > 0)
             this.getPlaylistItems(this.playlists[0]);
     }
-
-    _linkIntecepted(details) {
-        const { tabId } = details;
-        const playlist = this.tabsMap.get(tabId);
-
-        // valid single link intercepted
-        if (playlist && this._isValid(details.url)) {
-            const { links: lmap, reqLinks } = this.linksMap.get(playlist);
-            const link = this.tabId2Link.get(tabId);
-            const { requiredTypes } = lmap.get(link);
-            // an leftover probably
-            if (lmap == null || requiredTypes.length == reqLinks)
-                return;
-
-            try {
-                // // swap params so single download will suffice
-                // const clenRe = /clen=(\d+)/;
-                // const clen = parseInt(details.url.match(clenRe)[1]);
-                // const rangeRe = /range=0-\d+?/;
-                // details.url = details.url.replace(rangeRe, `range=0-${clen - 1}`);
-
-                // get associated data
-                const data = this.linksMap.get(playlist);
-                const url = this.tabId2Link.get(tabId);
-
-                // add data link to array associated with playlist's link
-                const { linksArr, requiredTypes } = data.links.get(url);
-                const mimesRe = /mime=(\w+)/;
-                const type = details.url.match(mimesRe)[1];
-                if (requiredTypes.has(type))
-                    requiredTypes.delete(type);
-                else
-                    return;
-
-                linksArr.push(details.url);
-                counter++;
-                // got 2 links (audio + video) this playlist's link is done
-                if (linksArr.length == 2)
-                    this._tabReady(tabId, playlist, data);
-
-            } catch (err) {
-                console.error(`url ${details.url} is invalid`, err);
-                console.log(link);
-                // TODO for now mark it as ready so entire playlist wont fail if one tab fails
-                const data = this.linksMap.get(playlist);
-                this._tabReady(tabId, playlist, data);
-            }
-        }
-    }
-
-    _isValid(url) {
-        return url.includes('rbuf=0');
-    }
-
 }
-
-
-class LinkExtractor {
-    // Handles extraction of single link
-    constructor(communicationHandler) {
-        this.communicationHandler = communicationHandler;
-
-        this.linkMap = new Map(); // url -> {linksArr: [str], requiredTypes: Set[str], echo: original request}
-        this.tabsMap = new Map(); // tabId -> url
-
-        chrome.webRequest.onCompleted.addListener(details => this._linkIntecepted(details), {
-            urls: ["*://*.googlevideo.com/*"]
-        });
-    }
-
-    addLink(link, echo) {
-        if (this.linkMap.has(link)) {
-            console.log(`link ${link} already enqueued`);
-            return;
-        }
-        this.linkMap.set(link, {
-            linksArr: [],
-            requiredTypes: new Set(['audio', 'video']),
-            echo: echo
-        });
-        this._getDataLinks(link);
-    }
-
-    _getDataLinks(link) {
-        chrome.tabs.create({
-            active: false,
-            url: link
-        }, tab => {
-            this.tabsMap.set(tab.id, link);
-        });
-    }
-
-    _linkIntecepted(details) {
-        const { tabId } = details;
-        const link = this.tabsMap.get(tabId);
-
-        if (link && this._isValid(details.url)) {
-            const { linksArr, requiredTypes } = this.linkMap.get(link);
-            try {
-                const mimesRe = /mime=(\w+)/;
-                const type = details.url.match(mimesRe)[1];
-
-                if (requiredTypes.has(type))
-                    requiredTypes.delete(type);
-                else
-                    return;
-
-                linksArr.push(details.url);
-                // got 2 links (audio + video) this playlist's link is done
-                if (linksArr.length == 2)
-                    this._tabReady(tabId, link);
-            }
-            catch (err) {
-                console.error(`url ${details.url} is invalid`, err);
-                console.log(link);
-            }
-        }
-    }
-
-    _tabReady(tabId, link,) {
-        this.tabsMap.delete(tabId);
-        const { linksArr, echo } = this.linkMap.get(link);
-        this.linkMap.delete(link);
-
-        chrome.tabs.remove(tabId);
-        this.communicationHandler.sendSingleLink(link, linksArr, echo);
-    }
-
-    _isValid(url) {
-        return url.includes('rbuf=0');
-    }
-}
-
 
 
 function main() {
     const ch = new ConnectionHandler();
 }
-
 
 main();
