@@ -4,7 +4,7 @@ import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
-from backend.model.db_models import Playlist, PlaylistLink
+from backend.model.db_models import DB_Playlist, PlaylistLink
 import multiprocessing as mp
 from backend.subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
@@ -56,7 +56,7 @@ class ExtManager(AppClosedObserver):
     def add_link_fetched_observer(self, obs: LinkFetchedObserver):
         self.link_fetched_obss.append(obs)
 
-    def query_playlist_links(self, playlist: Playlist):
+    def query_playlist_links(self, playlist: DB_Playlist):
         ext_data = {
             'url': playlist.url,
             'db_id': playlist.playlist_id

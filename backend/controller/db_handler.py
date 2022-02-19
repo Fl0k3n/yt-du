@@ -1,5 +1,5 @@
 from typing import List
-from backend.model.db_models import Base, DataLink, Playlist, PlaylistLink
+from backend.model.db_models import Base, DataLink, DB_Playlist, PlaylistLink
 from backend.utils.assets_loader import AssetsLoader as AL
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -24,27 +24,27 @@ class DBHandler(AppClosedObserver):
 
         self.session = Session(self.engine)
 
-    def add_playlist(self, playlist: Playlist):
+    def add_playlist(self, playlist: DB_Playlist):
         self.session.add(playlist)
 
-    def get_playlist(self, url: str = None, id: int = None) -> Playlist:
-        q = self.session.query(Playlist)
+    def get_playlist(self, url: str = None, id: int = None) -> DB_Playlist:
+        q = self.session.query(DB_Playlist)
         if id is not None:
-            q = q.filter(Playlist.playlist_id == id)
+            q = q.filter(DB_Playlist.playlist_id == id)
         if url is not None:
-            q = q.filter(Playlist.url == url)
+            q = q.filter(DB_Playlist.url == url)
 
         return q.first()
 
-    def get_playlists(self, offset: int, limit: int) -> List[Playlist]:
+    def get_playlists(self, offset: int, limit: int) -> List[DB_Playlist]:
         return (self.session
-                .query(Playlist)
-                .order_by(Playlist.added_at.desc())
+                .query(DB_Playlist)
+                .order_by(DB_Playlist.added_at.desc())
                 .offset(offset)
                 .limit(limit))
 
     def get_playlist_count(self) -> int:
-        return self.session.query(Playlist).count()
+        return self.session.query(DB_Playlist).count()
 
     def add_pl_link(self, pl_link: PlaylistLink):
         self.session.add(pl_link)
@@ -59,6 +59,6 @@ class DBHandler(AppClosedObserver):
         self.session.commit()
         self.session.close()
 
-    def delete_playlist(self, playlist: Playlist):
+    def delete_playlist(self, playlist: DB_Playlist):
         self.session.delete(playlist)
         self.commit()

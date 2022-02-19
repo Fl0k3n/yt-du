@@ -7,7 +7,7 @@ from backend.view.data_list_item import DataListItem
 # should derive from ABC, deleted because of metaclass conficts
 
 
-class Displayable:
+class Downloadable:
     @abstractmethod
     def to_data_list_item(self, show_details_command: Command,
                           pause_command: Command, resume_command: Command,
@@ -31,7 +31,35 @@ class Displayable:
     def set_status(self, status: DataStatus):
         pass
 
-    def get_size(self) -> str:
+    # @abstractmethod
+    # def get_url(self) -> str:
+    #     pass
+
+    # @abstractmethod
+    # def get_path(self) -> str:
+    #     pass
+
+    # @abstractmethod
+    # def is_pausable(self) -> bool:
+    #     pass
+
+    # @abstractmethod
+    # def is_resumable(self) -> bool:
+    #     pass
+
+    # @abstractmethod
+    # def is_removable(self) -> bool:
+    #     pass
+
+    # @abstractmethod
+    # def is_paused(self) -> bool:
+    #     pass
+
+    # @abstractmethod
+    # def is_finished(self) -> bool:
+    #     pass
+
+    def get_formatted_size(self) -> str:
         size_bytes = self.get_size_bytes()
 
         if size_bytes > 1073741824:  # GB

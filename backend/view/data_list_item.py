@@ -1,4 +1,5 @@
 from typing import Dict, Iterable
+from backend.utils.property import Property
 from backend.utils.util import open_dir_in_explorer
 from PyQt5.QtCore import Qt
 from backend.utils.commands.command import CallRcvrCommand, Command
@@ -10,30 +11,18 @@ from backend.view.scrollable_label import ScrollableLabel
 class DataListItem(QFrame):
     HEIGHT = 80
 
-    def __init__(self, url: str, directory_path: str, status: str,
-                 show_details_command: Command, pause_command: Command,
-                 resume_command: Command, is_pausable: bool, is_resumable: bool,
-                 parent: QWidget):
+    def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.url = url
-        self.status = status
-        self.directory_path = directory_path
-        self.is_pausable = is_pausable
-        self.is_resumable = is_resumable
 
-        self.setContentsMargins(0, 5, 0, 5)
-        self.layout = QGridLayout(self)
-        self.layout.setSpacing(10)
+        self._setup_default_properties()
 
-        self.setMinimumHeight(self.HEIGHT)
-        self.setMaximumHeight(self.HEIGHT)
-        self.setFrameStyle(1)
+        self.show_details_command = None
+        self.pause_command = None
+        self.resume_command = None
 
-        self.show_details_command = show_details_command
-        self.pause_command = pause_command
-        self.resume_command = resume_command
+        self._setup_gui_subcomponents()
 
-        self.status_label = ScrollableLabel(self, 120, 40, self.status)
+        self._setup_status_label()
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
@@ -43,13 +32,45 @@ class DataListItem(QFrame):
 
         self._create_menu()
 
+    def set_show_details_command(self, cmd: Command):
+        self.show_details_command = cmd
+
+    def set_pause_command(self, cmd: Command):
+        self.pause_command = cmd
+
+    def set_resume_command(self, cmd: Command):
+        self.resume_command = cmd
+
+    def _setup_default_properties(self):
+        # those properties should be public and bindable
+        self.url_property = Property("no url")
+        self.status_property = Property("no status")
+        self.directory_path_property = Property("no path")
+        self.is_pausable_property = Property(False)
+        self.is_resumable_property = Property(False)
+
+    def _setup_status_label(self):
+        self.status_label = ScrollableLabel(
+            self, 120, 40, self.status_property.get())
+
+        self.status_label.text_property.bind(self.status_property)
+
+    def _setup_gui_subcomponents(self):
+        self.setContentsMargins(0, 5, 0, 5)
+        self.layout = QGridLayout(self)
+        self.layout.setSpacing(10)
+
+        self.setMinimumHeight(self.HEIGHT)
+        self.setMaximumHeight(self.HEIGHT)
+        self.setFrameStyle(1)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFixedSize(150, 30)
+
     def update_progress_bar(self, val: float):
         v = int(val * 100)
         self.progress_bar.setValue(v)
-
-    def set_status(self, status: str):
-        self.status = status
-        self.status_label.setText(status)
 
     def mouseDoubleClickEvent(self, a0: QtGui.QMouseEvent) -> None:
         if self.show_details_command:
@@ -61,16 +82,24 @@ class DataListItem(QFrame):
         self.menu = QMenu(self)
 
         self.menu.addAction('Copy Url').triggered.connect(
-            lambda: QApplication.clipboard().setText(self.url))
+            lambda: QApplication.clipboard().setText(self.url_property.get()))
 
         self.menu.addAction('Open Location').triggered.connect(
             lambda: open_dir_in_explorer(
-                self.directory_path,
+                self.directory_path_property.get(),
                 CallRcvrCommand(lambda: print('doesnt exist'))))
 
-        self.pause_action = self._create_pause_action() if self.is_pausable else None
+        self.pause_action = self._create_pause_action(
+        ) if self.is_pausable_property.get() else None
 
-        self.resume_action = self._create_resume_action() if self.is_resumable else None
+        self.resume_action = self._create_resume_action(
+        ) if self.is_resumable_property.get() else None
+
+        self.is_pausable_property.add_property_changed_observer(
+            callback=lambda _, new: self._toggle_pausable_action(new))
+
+        self.is_resumable_property.add_property_changed_observer(
+            callback=lambda _, new: self._toggle_resume_action(new))
 
     def _create_pause_action(self) -> QAction:
         return self._create_action('Pause', self.pause_command)
@@ -80,7 +109,8 @@ class DataListItem(QFrame):
 
     def _create_action(self, text: str, cmd: Command) -> QAction:
         act = self.menu.addAction(text)
-        act.triggered.connect(lambda: cmd.execute())
+        act.triggered.connect(lambda: cmd.execute()
+                              if cmd is not None else None)
         return act
 
     def add_menu_item(self, text: str, cmd: Command) -> QAction:
@@ -102,21 +132,17 @@ class DataListItem(QFrame):
         for i, el in enumerate(items):
             self.layout.addWidget(el, 1, i + 1)
 
-    def set_pausable(self, pausable: bool):
-        print('setting pausable to ', pausable)
-        self.is_pausable = pausable
-        if self.is_pausable:
+    def _toggle_pausable_action(self, pausable: bool):
+        if pausable:
             if self.pause_action is None:
                 self.pause_action = self._create_pause_action()
         else:
             if self.pause_action is not None:
-                print('removing action')
                 self.menu.removeAction(self.pause_action)
                 self.pause_action = None
 
-    def set_resumable(self, resumable: bool):
-        self.is_resumable = resumable
-        if self.is_resumable:
+    def _toggle_resume_action(self, resumable: bool):
+        if resumable:
             if self.resume_action is None:
                 self.resume_action = self._create_resume_action()
         else:

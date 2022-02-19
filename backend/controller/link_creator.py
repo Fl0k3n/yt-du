@@ -3,7 +3,7 @@ from collections import defaultdict
 from backend.controller.db_handler import DBHandler
 from typing import Dict, Iterable, List, Set
 from backend.controller.link_created_observer import LinkCreatedObserver
-from backend.model.db_models import DataLink, Playlist, PlaylistLink
+from backend.model.db_models import DataLink, DB_Playlist, PlaylistLink
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
 from queue import Queue
@@ -59,7 +59,7 @@ class LinkCreator(AppClosedObserver):
         # pl link -> queried urls to-be-created
         self.not_ready: Dict[PlaylistLink, Set[str]] = {}
         # playlist -> number of links added
-        self.playlist_batches: Dict[Playlist, int] = defaultdict(lambda: 0)
+        self.playlist_batches: Dict[DB_Playlist, int] = defaultdict(lambda: 0)
         self._init_worker()
 
         self.link_created_observers: List[LinkCreatedObserver] = []

@@ -8,7 +8,7 @@ from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
 from typing import Deque, Dict, Iterable, List, Set, Tuple
 from backend.controller.db_handler import DBHandler
-from backend.model.db_models import DataLink, Playlist, PlaylistLink
+from backend.model.db_models import DataLink, DB_Playlist, PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
@@ -34,7 +34,8 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self.link_creator.add_link_created_observer(self)
         self.ipc_mgr.add_playlist_fetched_observer(self)
 
-        self.loaded_playlists: List[Playlist] = []  # list of loaded playlists
+        # list of loaded playlists
+        self.loaded_playlists: List[DB_Playlist] = []
         # playlist_url -> idx in list above
         self.pl_url_map: Dict[str, int] = {}
         # playlist_id  -> idx in list above
@@ -59,19 +60,19 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self.pl_tasks: Dict[int, Dict[PlaylistLink, int]] = {}
 
         # playlists that were requested to be paused
-        self.pl_pause_requests: Set[Playlist] = set()
+        self.pl_pause_requests: Set[DB_Playlist] = set()
         # links that were requested to be paused
         self.link_pause_requests: Set[PlaylistLink] = set()
         # playlist -> # of links requested to be paused
-        self.pl_links_pause_req_count: Dict[Playlist, int] = defaultdict(
+        self.pl_links_pause_req_count: Dict[DB_Playlist, int] = defaultdict(
             lambda: 0)
 
         # links that were requested to be resumed
         self.link_resume_requests: Set[PlaylistLink] = set()
         # playlists that were requested to be resumed
-        self.pl_resume_requests: Set[Playlist] = set()
+        self.pl_resume_requests: Set[DB_Playlist] = set()
 
-        self.deleted_while_fetching: Set[Playlist] = set()
+        self.deleted_while_fetching: Set[DB_Playlist] = set()
 
         self.pl_modified_observers: List[PlaylistModifiedObserver] = []
 
@@ -79,7 +80,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self.pl_modified_observers.append(obs)
         self.speedo.add_dl_speed_observer(obs)
 
-    def add_playlist(self, playlist: Playlist):
+    def add_playlist(self, playlist: DB_Playlist):
         playlist.set_status(DataStatus.WAIT_FOR_FETCH)
         self.db.add_playlist(playlist)
         self.db.commit()
@@ -89,7 +90,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         for obs in self.pl_modified_observers:
             obs.playlist_added(playlist)
 
-    def _cache_playlist(self, playlist: Playlist):
+    def _cache_playlist(self, playlist: DB_Playlist):
         if playlist is None:  # ???
             return
         idx = len(self.loaded_playlists)
@@ -97,7 +98,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self.pl_url_map[playlist.url] = idx
         self.pl_idx_map[playlist.playlist_id] = idx
 
-    def get_playlist(self, url: str = None, id: int = None) -> Playlist:
+    def get_playlist(self, url: str = None, id: int = None) -> DB_Playlist:
         # TODO make it less uqly
         if url is None and id is None:
             raise AttributeError('either url or id is required')
@@ -110,13 +111,13 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self._cache_playlist(playlist)
         return playlist
 
-    def get_playlists(self, offset: int = 0, limit: int = None) -> List[Playlist]:
+    def get_playlists(self, offset: int = 0, limit: int = None) -> List[DB_Playlist]:
         # TODO check if was cached
         playlists = list(self.db.get_playlists(offset, limit))
         # cache them
         return playlists
 
-    def _get_stored_playlist(self, url: str = None, id: int = None) -> Playlist:
+    def _get_stored_playlist(self, url: str = None, id: int = None) -> DB_Playlist:
         if url is not None and url in self.pl_url_map:
             return self.loaded_playlists[self.pl_url_map[url]]
 
@@ -293,7 +294,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         size = playlist_link.get_size_bytes()
         self.pl_link_sizes[playlist_link.link_id] = size
 
-    def _cache_playlist_size(self, playlist: Playlist):
+    def _cache_playlist_size(self, playlist: DB_Playlist):
         size = 0
         for link in playlist.links:
             if link.link_id not in self.pl_link_sizes:
@@ -305,7 +306,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         size = playlist_link.get_downloaded_bytes()
         self.dled_link_bytes[playlist_link.link_id] = size
 
-    def _cache_dled_playlist_bytes(self, playlist: Playlist):
+    def _cache_dled_playlist_bytes(self, playlist: DB_Playlist):
         size = 0
         for link in playlist.links:
             if link.link_id not in self.dled_link_bytes:
@@ -316,13 +317,13 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
     def _clear_link_dl_cache(self, playlist_link: PlaylistLink):
         self.dled_link_bytes.pop(playlist_link.link_id)
 
-    def get_playlist_size_bytes(self, playlist: Playlist) -> int:
+    def get_playlist_size_bytes(self, playlist: DB_Playlist) -> int:
         if playlist.playlist_id not in self.pl_sizes:
             self._cache_playlist_size(playlist)
 
         return self.pl_sizes[playlist.playlist_id]
 
-    def get_playlist_downloaded_bytes(self, playlist: Playlist) -> int:
+    def get_playlist_downloaded_bytes(self, playlist: DB_Playlist) -> int:
         if playlist.playlist_id not in self.dled_pl_bytes:
             self._cache_dled_playlist_bytes(playlist)
         return self.dled_pl_bytes[playlist.playlist_id]
@@ -458,7 +459,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
     # BRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
 
-    def on_playlist_pause_requested(self, playlist: Playlist):
+    def on_playlist_pause_requested(self, playlist: DB_Playlist):
         self.pl_pause_requests.add(playlist)
 
         for link in self.pl_tasks[playlist.playlist_id].keys():
@@ -487,7 +488,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
 
         return running
 
-    def is_playlist_pausable(self, playlist: Playlist) -> bool:
+    def is_playlist_pausable(self, playlist: DB_Playlist) -> bool:
         return playlist not in self.pl_pause_requests and \
             playlist.get_status() in {
                 DataStatus.WAIT_FOR_DL, DataStatus.DOWNLOADING}
@@ -498,7 +499,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
                 DataStatus.WAIT_FOR_DL, DataStatus.DOWNLOADING
             }
 
-    def is_playlist_resumable(self, playlist: Playlist) -> bool:
+    def is_playlist_resumable(self, playlist: DB_Playlist) -> bool:
         return playlist not in self.pl_resume_requests and \
             any(link.get_status() == DataStatus.PAUSED for link in playlist.links)
 
@@ -506,14 +507,14 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         return playlist_link not in self.link_resume_requests and \
             playlist_link.get_status() == DataStatus.PAUSED
 
-    def _is_playlist_finished(self, playlist: Playlist) -> bool:
+    def _is_playlist_finished(self, playlist: DB_Playlist) -> bool:
         return all(link.get_status() == DataStatus.FINISHED for link in playlist.links)
 
-    def _is_playlist_paused(self, playlist: Playlist) -> bool:
+    def _is_playlist_paused(self, playlist: DB_Playlist) -> bool:
         return all(link.get_status() in {DataStatus.FINISHED,
                                          DataStatus.PAUSED} for link in playlist.links)
 
-    def is_playlist_removable(self, playlist: Playlist) -> bool:
+    def is_playlist_removable(self, playlist: DB_Playlist) -> bool:
         return playlist.get_status() in {DataStatus.WAIT_FOR_FETCH,
                                          DataStatus.PAUSED,
                                          DataStatus.FINISHED}
@@ -521,7 +522,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
     def on_link_resume_requested(self, playlist_link: PlaylistLink):
         self._resume_link(playlist_link)
 
-    def on_playlist_resume_requested(self, playlist: Playlist):
+    def on_playlist_resume_requested(self, playlist: DB_Playlist):
         self.pl_resume_requests.add(playlist)
 
         for obs in self.pl_modified_observers:
@@ -585,7 +586,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         for obs in self.pl_modified_observers:
             obs.inconsistenty_fixed(playlist_link)
 
-    def delete_playlist(self, playlist: Playlist):
+    def delete_playlist(self, playlist: DB_Playlist):
         if playlist.get_status() == DataStatus.WAIT_FOR_FETCH:
             self.deleted_while_fetching.add(playlist)
 

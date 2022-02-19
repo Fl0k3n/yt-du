@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from backend.model.db_models import Playlist
+from backend.model.db_models import DB_Playlist
 from backend.controller.playlist_manager import PlaylistManager
 from backend.utils.yes_no_dialog import YesNoDialog
 from backend.utils.commands.command import CallRcvrCommand, Command
@@ -14,7 +14,7 @@ class NewPlaylistController:
         self.on_view_closed = on_view_closed
 
     def _add_playlist(self, name: str, url: str, path: str):
-        playlist = Playlist(name=name, url=url, directory_path=path)
+        playlist = DB_Playlist(name=name, url=url, directory_path=path)
 
         stored = self.playlist_manager.get_playlist(url)
         if stored is not None:

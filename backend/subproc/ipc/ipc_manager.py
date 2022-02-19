@@ -11,7 +11,7 @@ from backend.controller.observers.playlist_fetched_observer import PlaylistFetch
 from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
 from multiprocessing.connection import Connection, wait
 from typing import Dict, List, Set
-from backend.model.db_models import Playlist, PlaylistLink
+from backend.model.db_models import DB_Playlist, PlaylistLink
 from backend.subproc.ipc.message import Message, Messenger
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
 from backend.subproc.ipc.ext_manager import ExtManager
@@ -139,7 +139,7 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
 
         self.conn_to_child.pop(conn)
 
-    def query_playlist_links(self, playlist: Playlist):
+    def query_playlist_links(self, playlist: DB_Playlist):
         self.ext_manager.query_playlist_links(playlist)
 
     def query_link(self, playlist_link: PlaylistLink):

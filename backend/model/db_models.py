@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, TIMESTAMP, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func, text
-from backend.model.displayable import Displayable
+from backend.model.downloadable import Downloadable
 
 # TODO Rewrite all of them using wrapper classes so polymorphism can be used and
 # playlist manager doesnt look like gowno kurwa jego mac
@@ -25,7 +25,7 @@ merge_data_links = Table(
 )
 
 
-class Playlist(Base, Displayable):
+class DB_Playlist(Base, Downloadable):
     """Contains top-level info about playlist, name should be filename at which it should be saved,
     url should be of the form: https://www.youtube.com/watch?v=...&list=...
     """
@@ -46,7 +46,7 @@ class Playlist(Base, Displayable):
                           is_pausable: bool, is_resumable: bool,
                           parent: QWidget = None) -> PlaylistListItem:
         if self.get_status() not in {DataStatus.UNDEFINED, DataStatus.WAIT_FOR_FETCH}:
-            size = self.get_size()
+            size = self.get_formatted_size()
         else:
             size = None
 
@@ -77,7 +77,7 @@ class Playlist(Base, Displayable):
         return False
 
 
-class PlaylistLink(Base, Displayable):
+class PlaylistLink(Base, Downloadable):
     """Info about specific playlist item, title will be used as filename"""
     __tablename__ = 'playlist_links'
     link_id = Column(Integer, primary_key=True, autoincrement=True)

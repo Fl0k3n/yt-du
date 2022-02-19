@@ -1,7 +1,7 @@
 from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
-from backend.model.db_models import Playlist
+from backend.model.db_models import DB_Playlist
 from typing import Dict, List, Set
 from collections import defaultdict
 import time
@@ -31,11 +31,11 @@ class Speedo(AppClosedObserver):
 
     def __init__(self) -> None:
         # for how many seconds was downloading
-        self.total_elapsed: Dict[Playlist, float] = defaultdict(lambda: 0.0)
+        self.total_elapsed: Dict[DB_Playlist, float] = defaultdict(lambda: 0.0)
         # bytes
-        self.total_dled: Dict[Playlist, int] = defaultdict(lambda: 0)
+        self.total_dled: Dict[DB_Playlist, int] = defaultdict(lambda: 0)
 
-        self.currently_tracked: Set[Playlist] = set()
+        self.currently_tracked: Set[DB_Playlist] = set()
 
         self.dl_speed_obss: List[DlSpeedUpdatedObserver] = []
 
@@ -51,16 +51,16 @@ class Speedo(AppClosedObserver):
     def add_dl_speed_observer(self, obs: DlSpeedUpdatedObserver):
         self.dl_speed_obss.append(obs)
 
-    def dl_stopped(self, playlist: Playlist):
+    def dl_stopped(self, playlist: DB_Playlist):
         self.currently_tracked.remove(playlist)
 
-    def dl_resumed(self, playlist: Playlist):
+    def dl_resumed(self, playlist: DB_Playlist):
         self.currently_tracked.add(playlist)
 
-    def dl_progressed(self, playlist: Playlist, dled_bytes: int):
+    def dl_progressed(self, playlist: DB_Playlist, dled_bytes: int):
         self.total_dled[playlist] += dled_bytes
 
-    def get_avg_speed_MBps(self, playlist: Playlist) -> float:
+    def get_avg_speed_MBps(self, playlist: DB_Playlist) -> float:
         delta_t = self.total_elapsed[playlist]
         size = self.total_dled[playlist]
 
