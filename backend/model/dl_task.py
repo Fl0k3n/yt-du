@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
+from backend.model.data_link import DataLink
 from backend.subproc.yt_dl import MediaURL, Resumer
-from backend.model.db_models import DB_DataLink
-from typing import Iterable, List, Tuple
+from typing import List
 
 
 class DlTask(ABC):
-    def __init__(self, dest_path: str, url: str, data_links: List[DB_DataLink]):
+    def __init__(self, dest_path: str, url: str, data_links: List[DataLink]):
         self.dest_path = dest_path
         self.url = url
         self.data_links = data_links
@@ -29,7 +28,7 @@ class DlTask(ABC):
         return self.dest_path
 
     def get_media_urls(self) -> List[str]:
-        return [link.url for link in self.data_links]
+        return [link.get_url() for link in self.data_links]
 
     def get_resumer(self) -> Resumer:
         return self.resumer

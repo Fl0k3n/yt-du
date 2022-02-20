@@ -3,9 +3,9 @@ Module is independant of any external modules (excluding standard ones listed be
 when used from another script user should create YTDownloader instance
 with appropriate StatusObserver instance for communication.
 Then download method should be called. If download should be resumed, user 
-has to provide appropriate Resumer object. If link has expired and at least 1 renewed 
+has to provide appropriate Resumer object. If a link has expired and at least 1 renewed 
 media link is inconsistent entire data will be cleaned up and process will abort,
-user should restart process with renewed data links.
+user should restart the process with renewed data links.
 
 Downloader downloads passed media links in separate threads, then merges them
 using ffmpeg subprocess, stderr of ffmpeg can be obtained.
@@ -17,17 +17,17 @@ Python: 3.8.10
 import sys
 import re
 import os
-from typing import Generator, Iterable, List, Tuple
 import requests
-from requests import ConnectionError
 import threading
+import random
+import time
+import urllib.parse as parse
+from abc import ABC, abstractmethod
+from typing import Generator, Iterable, List, Tuple
+from requests import ConnectionError
 from queue import Queue, Empty
 from pathlib import Path
-import random
 from enum import Enum
-import time
-from abc import ABC, abstractmethod
-import urllib.parse as parse
 
 
 PARENT_DIR = Path(__file__).parent.absolute()
@@ -185,6 +185,11 @@ class UnsupportedURLError(Exception):
         return msg
 
 
+class MediaURLType(Enum):
+    CLEN = 1
+    SEQ = 2
+
+
 class MediaURL(ABC):
     """If getting parameter requires extra work lazy init will be used"""
 
@@ -194,6 +199,10 @@ class MediaURL(ABC):
         self.resumed = resumed
         self.fetch_retries = fetch_retries
         self.retry_timeout = retry_timeout
+
+    @abstractmethod
+    def get_media_type(self) -> MediaURLType:
+        pass
 
     @abstractmethod
     def get_size(self) -> int:
@@ -340,6 +349,9 @@ class ClenMediaURL(MediaURL):
 
     def set_size(self, size: int):
         self.size = size
+
+    def get_media_type(self) -> MediaURLType:
+        return MediaURLType.CLEN
 
     def _get_renew_params(self) -> List[str]:
         return ['range', 'rn', 'rbuf']
@@ -541,6 +553,9 @@ class SegmentedMediaURL(MediaURL):
             self.size = self._get_size()
 
         return self.size
+
+    def get_media_type(self) -> MediaURLType:
+        return MediaURLType.SEQ
 
     def set_size(self, size: int):
         self.size = size

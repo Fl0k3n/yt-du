@@ -1,7 +1,7 @@
-from backend.controller.observers.link_fetched_observer import LinkFetchedObserver
+from backend.model.link_fetched_observer import LinkFetchedObserver
 from typing import Any, Dict, List
 import urllib.parse as parse
-from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
+from backend.model.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.playlist import Playlist
 from backend.model.playlist_link import PlaylistLink
 from backend.subproc.ipc.ipc_codes import ExtCodes

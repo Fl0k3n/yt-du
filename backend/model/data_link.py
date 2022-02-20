@@ -1,12 +1,18 @@
-
 from datetime import datetime
 from backend.model.db_models import DB_DataLink, DB_DownloadErrorLog
 from backend.utils.property import Property
 
+try:
+    from backend.model.playlist_link import PlaylistLink
+except ImportError:
+    # will happen because of cyclic imports, module needed only for type hints
+    pass
+
 
 class DataLink:
-    def __init__(self, db_dlink: DB_DataLink) -> None:
+    def __init__(self, db_dlink: DB_DataLink, playlist_link: "PlaylistLink") -> None:
         self.db_dlink = db_dlink
+        self.playlist_link = playlist_link
         self._setup_properties()
 
     def _setup_properties(self):
@@ -25,6 +31,9 @@ class DataLink:
         self.dl_start_time_property = Property(
             self.db_dlink.download_start_time)
         self.last_chunk_url_property = Property(self.db_dlink.last_chunk_url)
+
+    def get_playlist_link(self) -> "PlaylistLink":
+        return self.playlist_link
 
     def get_error_logs(self) -> DB_DownloadErrorLog:
         # TODO
@@ -83,3 +92,7 @@ class DataLink:
     def set_dl_start_time(self, starttime: datetime):
         self.db_dlink.download_start_time = starttime
         self.dl_start_time_property.set(starttime)
+
+    def set_last_chunk_url(self, url: str):
+        self.db_dlink.last_chunk_url = url
+        self.last_chunk_url_property.set(url)

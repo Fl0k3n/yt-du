@@ -5,14 +5,14 @@ from backend.view.data_summary_box import DataSummaryBox
 from backend.controller.gui.new_playlist_ctl import NewPlaylistController
 from backend.utils.commands.command import CallRcvrCommand
 from backend.controller.playlist_manager import PlaylistManager
-from backend.controller.db_handler import DBHandler
+from backend.db.db_session import DBSession
 from backend.view.main_window import MainWindow
 from backend.controller.gui.data_summary_ctl import DataSummaryController
 from backend.controller.gui.view_changer import DataViewChanger
 
 
 class MainWindowController(DataViewChanger):
-    def __init__(self, playlist_manager: PlaylistManager, db: DBHandler):
+    def __init__(self, playlist_manager: PlaylistManager, db: DBSession):
         self.playlist_mgr = playlist_manager
         self.db = db
         self.new_playlist_ctl = None

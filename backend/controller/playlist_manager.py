@@ -1,20 +1,20 @@
-from backend.controller.link_created_observer import LinkCreatedObserver
+from backend.model.link_created_observer import LinkCreatedObserver
 from backend.controller.gui.app_closed_observer import AppClosedObserver
 from backend.controller.speedo import Speedo
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
 from backend.model.playlist_link_task import PlaylistLinkTask
-from backend.controller.playlist_dl_manager import PlaylistDlManager
+from backend.model.playlist_dl_manager import PlaylistDlManager
 from pathlib import Path
 from backend.subproc.ipc.ipc_manager import IPCManager
 from typing import Deque, Dict, Iterable, List, Set, Tuple
-from backend.controller.db_handler import DBHandler
+from backend.db.db_session import DBSession
 from backend.model.db_models import DB_DataLink, DB_Playlist, DB_PlaylistLink
 from backend.controller.observers.playlist_modified_observer import PlaylistModifiedObserver
-from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
+from backend.model.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.data_status import DataStatus
 from backend.subproc.yt_dl import UnsupportedURLError
-from backend.controller.link_creator import LinkCreator
-from backend.controller.link_renewer import LinkRenewer
+from backend.model.link_creator import LinkCreator
+from backend.model.link_renewer import LinkRenewer
 import datetime
 import re
 from collections import defaultdict
@@ -23,7 +23,7 @@ from collections import defaultdict
 
 
 class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObserver, LinkCreatedObserver):
-    def __init__(self, db: DBHandler, ipc_mgr: IPCManager, speedo: Speedo,
+    def __init__(self, db: DBSession, ipc_mgr: IPCManager, speedo: Speedo,
                  link_renewer: LinkRenewer, link_creator: LinkCreator):
         self.db = db
         self.ipc_mgr = ipc_mgr
@@ -166,7 +166,7 @@ class PlaylistManager(PlaylistFetchedObserver, PlaylistDlManager, AppClosedObser
         self.db.commit()
 
         for pl_link, dlinks in zip(pl_links, data_links):
-            self.link_creator.add_playlist_link(pl_link, dlinks)
+            self.link_creator.schedule_creation_task(pl_link, dlinks)
 
     def on_link_created(self, playlist_link: DB_PlaylistLink, playlist_rdy: bool):
         size = playlist_link.get_size_bytes()
