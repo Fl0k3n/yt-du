@@ -1,13 +1,11 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from backend.model.data_status import DataStatus
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QWidget
 from backend.view.data_list_item import DataListItem
 
-# should derive from ABC, deleted because of metaclass conficts
 
-
-class Downloadable:
+class Downloadable(ABC):
     @abstractmethod
     def to_data_list_item(self, show_details_command: Command,
                           pause_command: Command, resume_command: Command,
@@ -31,13 +29,13 @@ class Downloadable:
     def set_status(self, status: DataStatus):
         pass
 
-    # @abstractmethod
-    # def get_url(self) -> str:
-    #     pass
+    @abstractmethod
+    def get_url(self) -> str:
+        pass
 
-    # @abstractmethod
-    # def get_path(self) -> str:
-    #     pass
+    @abstractmethod
+    def get_path(self) -> str:
+        pass
 
     # @abstractmethod
     # def is_pausable(self) -> bool:

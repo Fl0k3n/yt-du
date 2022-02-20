@@ -6,7 +6,7 @@ from backend.model.downloadable import Downloadable
 from typing import Dict, Iterable, List, Set
 from collections import deque
 from backend.view.data_list_item import DataListItem
-from backend.model.db_models import DB_Playlist, PlaylistLink
+from backend.model.db_models import DB_Playlist, DB_PlaylistLink
 from backend.controller.playlist_manager import PlaylistManager
 from backend.view.data_summary_box import DataSummaryBox
 from utils.commands.command import CallRcvrCommand, Command
@@ -143,7 +143,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         self._set_pausable(playlist, True)
         self._set_removable(playlist, False)
 
-    def link_dl_started(self, playlist_link: PlaylistLink):
+    def link_dl_started(self, playlist_link: DB_PlaylistLink):
         self._update_status(playlist_link)
         self._set_pausable(playlist_link, True)
 
@@ -193,14 +193,14 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
     def _get_playlist_resume_cmd(self, playlist: DB_Playlist) -> Command:
         return CallRcvrCommand(self.playlist_mgr.on_playlist_resume_requested, playlist)
 
-    def _get_link_details_cmd(self, link: PlaylistLink) -> Command:
+    def _get_link_details_cmd(self, link: DB_PlaylistLink) -> Command:
         # TODO show errs
         return CallRcvrCommand(lambda: print("LINK DETAILS REQUESTED"))
 
-    def _get_link_pause_cmd(self, link: PlaylistLink) -> Command:
+    def _get_link_pause_cmd(self, link: DB_PlaylistLink) -> Command:
         return CallRcvrCommand(self.playlist_mgr.on_link_pause_requested, link)
 
-    def _get_link_resume_cmd(self, link: PlaylistLink) -> Command:
+    def _get_link_resume_cmd(self, link: DB_PlaylistLink) -> Command:
         return CallRcvrCommand(self.playlist_mgr.on_link_resume_requested, link)
 
     def _get_playlist_delete_cmd(self, playlist: DB_Playlist) -> Command:
@@ -218,23 +218,23 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         pl_dled = self.playlist_mgr.get_playlist_downloaded_bytes(playlist)
         self._update_dl_progress(playlist, pl_size, pl_dled)
 
-    def _update_link_progress(self, playlist_link: PlaylistLink):
+    def _update_link_progress(self, playlist_link: DB_PlaylistLink):
         link_size = self.playlist_mgr.get_link_size_bytes(playlist_link)
         link_dled = self.playlist_mgr.get_link_downloaded_bytes(playlist_link)
         self._update_dl_progress(playlist_link, link_size, link_dled)
 
-    def playlist_dl_progressed(self, playlist: DB_Playlist, playlist_link: PlaylistLink):
+    def playlist_dl_progressed(self, playlist: DB_Playlist, playlist_link: DB_PlaylistLink):
         self._update_pl_progress(playlist)
         self._update_link_progress(playlist_link)
 
-    def playlist_link_dled(self, playlist_link: PlaylistLink):
+    def playlist_link_dled(self, playlist_link: DB_PlaylistLink):
         self._update_status(playlist_link)
         self._set_pausable(playlist_link, False)
 
-    def playlist_link_merging(self, playlist_link: PlaylistLink):
+    def playlist_link_merging(self, playlist_link: DB_PlaylistLink):
         self._update_status(playlist_link)
 
-    def playlist_link_finished(self, playlist_link: PlaylistLink):
+    def playlist_link_finished(self, playlist_link: DB_PlaylistLink):
         self._update_status(playlist_link)
 
     def playlist_finished(self, playlist: DB_Playlist):
@@ -242,10 +242,10 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         self._set_pausable(playlist, False)
         self._set_removable(playlist, True)
 
-    def playlist_link_resume_requested(self, playlist_link: PlaylistLink):
+    def playlist_link_resume_requested(self, playlist_link: DB_PlaylistLink):
         self._set_resumable(playlist_link, False)
 
-    def playlist_link_pause_requested(self, playlist_link: PlaylistLink):
+    def playlist_link_pause_requested(self, playlist_link: DB_PlaylistLink):
         self._set_pausable(playlist_link, False)
 
     def playlist_pause_requested(self, playlist: DB_Playlist):
@@ -255,7 +255,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         self._set_resumable(playlist, False)
         self._set_removable(playlist, False)
 
-    def playlist_link_paused(self, playlist_link: PlaylistLink):
+    def playlist_link_paused(self, playlist_link: DB_PlaylistLink):
         self._update_status(playlist_link)
         self._set_resumable(playlist_link, True)
 
@@ -293,7 +293,7 @@ class DataSummaryController(PlaylistModifiedObserver, ViewChangedObserver):
         except KeyError:
             pass
 
-    def inconsistenty_fixed(self, playlist_link: PlaylistLink):
+    def inconsistenty_fixed(self, playlist_link: DB_PlaylistLink):
         playlist = playlist_link.playlist
         self._set_pausable(playlist_link, True)
         self._set_resumable(playlist_link, False)

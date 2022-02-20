@@ -4,13 +4,13 @@ from backend.subproc.yt_dl import MediaURL
 from backend.controller.playlist_dl_manager import PlaylistDlManager
 from typing import Deque, Dict, List, Tuple
 from backend.model.dl_task import DlTask
-from backend.model.db_models import DataLink, PlaylistLink
+from backend.model.db_models import DB_DataLink, DB_PlaylistLink
 from collections import deque
 
 
 class PlaylistLinkTask(DlTask):
-    def __init__(self, playlist_link: PlaylistLink, pl_dl_mgr: PlaylistDlManager,
-                 link_renewer: LinkRenewer, dest_path: str, url: str, data_links: List[DataLink]):
+    def __init__(self, playlist_link: DB_PlaylistLink, pl_dl_mgr: PlaylistDlManager,
+                 link_renewer: LinkRenewer, dest_path: str, url: str, data_links: List[DB_DataLink]):
         super().__init__(dest_path, url, data_links)
         self.pl_dl_mgr = pl_dl_mgr
         self.link_renewer = link_renewer

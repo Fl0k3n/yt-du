@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
 from typing import Iterable
-from backend.model.db_models import DB_Playlist, PlaylistLink
+from backend.model.db_models import DB_Playlist, DB_PlaylistLink
 
 
 class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
@@ -18,23 +18,23 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
         pass
 
     @abstractmethod
-    def link_dl_started(self, playlist_link: PlaylistLink):
+    def link_dl_started(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
-    def playlist_dl_progressed(self, playlist: DB_Playlist, playlist_link: PlaylistLink):
+    def playlist_dl_progressed(self, playlist: DB_Playlist, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
-    def playlist_link_dled(self, playlist_link: PlaylistLink):
+    def playlist_link_dled(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
-    def playlist_link_merging(self, playlist_link: PlaylistLink):
+    def playlist_link_merging(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
-    def playlist_link_finished(self, playlist_link: PlaylistLink):
+    def playlist_link_finished(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
@@ -42,7 +42,7 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
         pass
 
     @abstractmethod
-    def playlist_link_paused(self, playlist_link: PlaylistLink):
+    def playlist_link_paused(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
@@ -50,7 +50,7 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
         pass
 
     @abstractmethod
-    def playlist_link_pause_requested(self, playlist_link: PlaylistLink):
+    def playlist_link_pause_requested(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
@@ -58,7 +58,7 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
         pass
 
     @abstractmethod
-    def playlist_link_resume_requested(self, playlist_link: PlaylistLink):
+    def playlist_link_resume_requested(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod
@@ -66,7 +66,7 @@ class PlaylistModifiedObserver(DlSpeedUpdatedObserver, ABC):
         pass
 
     @abstractmethod
-    def inconsistenty_fixed(self, playlist_link: PlaylistLink):
+    def inconsistenty_fixed(self, playlist_link: DB_PlaylistLink):
         pass
 
     @abstractmethod

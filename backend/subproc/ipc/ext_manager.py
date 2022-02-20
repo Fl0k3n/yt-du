@@ -2,9 +2,10 @@ from backend.controller.observers.link_fetched_observer import LinkFetchedObserv
 from typing import Any, Dict, List
 import urllib.parse as parse
 from backend.controller.observers.playlist_fetched_observer import PlaylistFetchedObserver
+from backend.model.playlist import Playlist
+from backend.model.playlist_link import PlaylistLink
 from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
-from backend.model.db_models import DB_Playlist, PlaylistLink
 import multiprocessing as mp
 from backend.subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
@@ -56,10 +57,10 @@ class ExtManager(AppClosedObserver):
     def add_link_fetched_observer(self, obs: LinkFetchedObserver):
         self.link_fetched_obss.append(obs)
 
-    def query_playlist_links(self, playlist: DB_Playlist):
+    def query_playlist_links(self, playlist: Playlist):
         ext_data = {
-            'url': playlist.url,
-            'db_id': playlist.playlist_id
+            'url': playlist.get_url(),
+            'db_id': playlist.get_playlist_id()
         }
 
         msg = Message(ExtCodes.FETCH_PLAYLIST, ext_data)
@@ -67,10 +68,10 @@ class ExtManager(AppClosedObserver):
 
     def query_link(self, playlist_link: PlaylistLink):
         ext_data = {
-            'url': playlist_link.url
+            'url': playlist_link.get_url()
         }
 
-        self.fetch_link_queries[playlist_link.url] = playlist_link
+        self.fetch_link_queries[playlist_link.get_url()] = playlist_link
 
         msg = Message(ExtCodes.FETCH_LINK, ext_data)
         self.msger.send(self.ext_conn, msg)
@@ -135,12 +136,12 @@ class ExtManager(AppClosedObserver):
 
     def query_link_blocking(self, playlist_link: PlaylistLink) -> List[str]:
         ext_data = {
-            'url': playlist_link.url
+            'url': playlist_link.get_url()
         }
         with self.link_fetch_lock:
             self.last_query_id += 1
             q_id = self.last_query_id
-            self.blocking_link_queries[playlist_link.url] = q_id
+            self.blocking_link_queries[playlist_link.get_url()] = q_id
 
         msg = Message(ExtCodes.FETCH_LINK, ext_data)
         self.msger.send(self.ext_conn, msg)

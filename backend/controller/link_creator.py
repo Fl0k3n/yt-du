@@ -3,20 +3,20 @@ from collections import defaultdict
 from backend.controller.db_handler import DBHandler
 from typing import Dict, Iterable, List, Set
 from backend.controller.link_created_observer import LinkCreatedObserver
-from backend.model.db_models import DataLink, DB_Playlist, PlaylistLink
+from backend.model.db_models import DB_DataLink, DB_Playlist, DB_PlaylistLink
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
 from queue import Queue
 
 
 class Task:
-    def __init__(self, playlist_link: PlaylistLink, data_url: str) -> None:
+    def __init__(self, playlist_link: DB_PlaylistLink, data_url: str) -> None:
         self.pl_link = playlist_link
         self.data_url = data_url
 
 
 class DoneTask:
-    def __init__(self, playlist_link: PlaylistLink, dlink: DataLink):
+    def __init__(self, playlist_link: DB_PlaylistLink, dlink: DB_DataLink):
         self.pl_link = playlist_link
         self.dlink = dlink
 
@@ -39,8 +39,8 @@ class LinkCreatorWorker(QObject):
                 media_url = create_media_url(url)
                 size = media_url.get_size()
 
-                dl = DataLink(url=url, size=size,
-                              mime=media_url.get_mime(), expire=media_url.get_expire_time())
+                dl = DB_DataLink(url=url, size=size,
+                                 mime=media_url.get_mime(), expire=media_url.get_expire_time())
 
                 self.created.emit(DoneTask(task.pl_link, dl))
             except UnsupportedURLError as e:
@@ -57,7 +57,7 @@ class LinkCreator(AppClosedObserver):
     def __init__(self, db: DBHandler) -> None:
         self.db = db
         # pl link -> queried urls to-be-created
-        self.not_ready: Dict[PlaylistLink, Set[str]] = {}
+        self.not_ready: Dict[DB_PlaylistLink, Set[str]] = {}
         # playlist -> number of links added
         self.playlist_batches: Dict[DB_Playlist, int] = defaultdict(lambda: 0)
         self._init_worker()
@@ -67,7 +67,7 @@ class LinkCreator(AppClosedObserver):
     def add_link_created_observer(self, obs: LinkCreatedObserver):
         self.link_created_observers.append(obs)
 
-    def add_playlist_link(self, playlist_link: PlaylistLink, dlinks: Iterable[str]):
+    def add_playlist_link(self, playlist_link: DB_PlaylistLink, dlinks: Iterable[str]):
         self.not_ready[playlist_link] = set(dlinks)
         self.playlist_batches[playlist_link.playlist] += 1
 

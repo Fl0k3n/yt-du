@@ -1,5 +1,5 @@
 from typing import List
-from backend.model.db_models import Base, DataLink, DB_Playlist, PlaylistLink
+from backend.model.db_models import Base, DB_DataLink, DB_Playlist, DB_PlaylistLink
 from backend.utils.assets_loader import AssetsLoader as AL
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -46,10 +46,10 @@ class DBHandler(AppClosedObserver):
     def get_playlist_count(self) -> int:
         return self.session.query(DB_Playlist).count()
 
-    def add_pl_link(self, pl_link: PlaylistLink):
+    def add_pl_link(self, pl_link: DB_PlaylistLink):
         self.session.add(pl_link)
 
-    def add_data_link(self, data_link: DataLink):
+    def add_data_link(self, data_link: DB_DataLink):
         self.session.add(data_link)
 
     def commit(self):

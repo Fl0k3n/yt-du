@@ -1,5 +1,5 @@
-from backend.model.db_models import DataLink, PlaylistLink
 from backend.model.data_status import DataStatus
+from backend.model.playlist_link import PlaylistLink
 from backend.subproc.yt_dl import Resumer
 from pathlib import Path
 from typing import Dict, List, Set
@@ -9,12 +9,12 @@ class PlaylistLinkResumer(Resumer):
     def __init__(self, playlist_link: PlaylistLink):
         # that data should be cached so connection to db from another process
         # wont be made DI my *****
-        self.tmp_files_dir = playlist_link.tmp_files_dir
-        dlinks = playlist_link.data_links
+        self.tmp_files_dir = playlist_link.get_tmp_files_dir()
+        dlinks = playlist_link.get_data_links()
         self.links_count = len(dlinks)
 
         self.dlink_paths, self.dlink_sizes, self.dlink_dled_sizes = tuple(
-            zip(*[(dlink.path, dlink.size, dlink.downloaded)
+            zip(*[(dlink.get_path(), dlink.get_size(), dlink.get_dled_size())
                   for dlink in dlinks]))
 
         self.finished_dlinks_count = len([1
