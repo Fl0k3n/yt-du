@@ -3,6 +3,7 @@ from backend.model.data_link import DataLink
 from backend.model.data_status import DataStatus
 from backend.model.db_models import DB_PlaylistLink
 from backend.model.downloadable import Downloadable
+from backend.model.downloadable_type import DownloadableType
 from backend.utils.property import Property
 
 try:
@@ -15,8 +16,10 @@ except ImportError:
 class PlaylistLink(Downloadable):
     def __init__(self, db_link: DB_PlaylistLink, playlist: "Playlist") -> None:
         super().__init__()
+
         self.db_link = db_link
         self.data_links: List[DataLink] = []
+        self._setup_properties()
 
         for db_dlink in self.db_link.data_links:
             dlink = DataLink(db_dlink, self)
@@ -25,19 +28,20 @@ class PlaylistLink(Downloadable):
         self.playlist = playlist
         self.dl_task_id = None
         self.link_dling_count = 0
-        self._setup_properties()
 
     def _setup_properties(self):
         super()._setup_properties()
-        self.link_id_property = Property(self.db_link.link_id)
-        self.playlist_number_property = Property(self.db_link.playlist_number)
-        self.url_property = Property(self.db_link.url)
-        self.name_property = Property(self.db_link.title)
-        self.playlist_id_property = Property(self.db_link.playlist_number)
-        self.cleaned_up_property = Property(self.db_link.cleaned_up)
-        self.status_property = Property(DataStatus(self.db_link.status))
-        self.path_property = Property(self.db_link.path)
-        self.tmp_files_dir_property = Property(self.db_link.tmp_files_dir)
+        self.link_id_property = Property[int](self.db_link.link_id)
+        self.playlist_number_property = Property[int](
+            self.db_link.playlist_number)
+        self.url_property = Property[str](self.db_link.url)
+        self.name_property = Property[str](self.db_link.title)
+        self.playlist_id_property = Property[int](self.db_link.playlist_number)
+        self.cleaned_up_property = Property[bool](self.db_link.cleaned_up)
+        self.status_property = Property[DataStatus](
+            DataStatus(self.db_link.status))
+        self.path_property = Property[str](self.db_link.path)
+        self.tmp_files_dir_property = Property[str](self.db_link.tmp_files_dir)
 
     def set_dl_task_id(self, tid: int):
         self.dl_task_id = tid
@@ -77,6 +81,9 @@ class PlaylistLink(Downloadable):
     def get_playlist_id(self) -> int:
         return self.playlist_id_property.get()
 
+    def get_downloadable_type(self) -> DownloadableType:
+        return DownloadableType.LINK
+
     def is_cleaned_up(self) -> bool:
         return self.cleaned_up_property.get()
 
@@ -88,6 +95,27 @@ class PlaylistLink(Downloadable):
 
     def get_tmp_files_dir(self) -> str:
         return self.tmp_files_dir_property.get()
+
+    def get_downloaded_bytes(self) -> int:
+        return sum(dlink.get_dled_size() for dlink in self.data_links)
+
+    def get_size_bytes(self) -> int:
+        return sum(dlink.get_size() for dlink in self.data_links)
+
+    def get_url_property(self) -> Property[str]:
+        return self.url_property
+
+    def get_status_property(self) -> Property[DataStatus]:
+        return self.status_property
+
+    def get_path_property(self) -> Property[str]:
+        return self.path_property
+
+    def get_name_property(self) -> Property[str]:
+        return self.name_property
+
+    def get_playlist_number_property(self) -> Property[int]:
+        return self.playlist_number_property
 
     def is_finished(self) -> bool:
         return self.get_status() == DataStatus.FINISHED
@@ -138,12 +166,6 @@ class PlaylistLink(Downloadable):
     def set_tmp_files_dir_path(self, path: str):
         self.db_link.tmp_files_dir = path
         self.tmp_files_dir_property.set(path)
-
-    def get_downloaded_bytes(self) -> int:
-        return sum(dlink.get_dled_size() for dlink in self.data_links)
-
-    def get_size_bytes(self) -> int:
-        return sum(dlink.get_size() for dlink in self.data_links)
 
     def add_data_link(self, dlink: DataLink):
         self.data_links.append(dlink)

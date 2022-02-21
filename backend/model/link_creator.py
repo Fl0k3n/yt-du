@@ -1,4 +1,4 @@
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 from collections import defaultdict
 from typing import Dict, Iterable, List, Set
 from backend.model.link_created_observer import LinkCreatedObserver

@@ -1,10 +1,11 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Set
+from typing import Iterable, Set
 from backend.model.data_status import DataStatus
 from backend.model.db_models import DB_Playlist
 from backend.model.downloadable import Downloadable
+from backend.model.downloadable_type import DownloadableType
 from backend.model.playlist_link import PlaylistLink
 from backend.utils.observable_list import ObservableList
 from backend.utils.property import Property
@@ -14,34 +15,41 @@ class Playlist(Downloadable):
     def __init__(self, db_playlist: DB_Playlist) -> None:
         super().__init__()
         self.db_playlist = db_playlist
-        self.playlist_links: List[PlaylistLink] = ObservableList()
+        self.playlist_links = ObservableList[PlaylistLink]()
+        self._setup_properties()
 
         for db_link in self.db_playlist.links:
             pl_link = PlaylistLink(db_link, self)
             self.add_playlist_link(pl_link)
 
-        self._setup_properties()
-
         self.downloading_links: Set[PlaylistLink] = set()
-        self.is_deleted = False
         self.dling_count = 0
 
     def _setup_properties(self):
         super()._setup_properties()
-        self.playlist_id_property = Property(self.db_playlist.playlist_id)
-        self.name_property = Property(self.db_playlist.name)
-        self.url_property = Property(self.db_playlist.url)
-        self.directory_path_property = Property(
+        self.playlist_id_property = Property[int](self.db_playlist.playlist_id)
+        self.name_property = Property[str](self.db_playlist.name)
+        self.url_property = Property[str](self.db_playlist.url)
+        self.directory_path_property = Property[str](
             self.db_playlist.directory_path)
-        self.added_at_property = Property(self.db_playlist.added_at)
-        self.finished_at_property = Property(self.db_playlist.finished_at)
-        self.status_property = Property(DataStatus(self.db_playlist.status))
+        self.added_at_property = Property[datetime](self.db_playlist.added_at)
+        self.finished_at_property = Property[datetime](
+            self.db_playlist.finished_at)
+        self.status_property = Property[DataStatus](
+            DataStatus(self.db_playlist.status))
+        self.dl_speed_mbps_property = Property[float](0.0)
 
     def add_dling_link(self, playlist_link: PlaylistLink):
         self.downloading_links.add(playlist_link)
 
     def remove_dling_link(self, playlist_link: PlaylistLink):
         self.downloading_links.remove(playlist_link)
+
+    def get_dl_speed_mbps(self) -> float:
+        return self.dl_speed_mbps_property.get()
+
+    def set_dl_speed_mbps(self, speed: float):
+        self.dl_speed_mbps_property.set(speed)
 
     def get_downloading_links(self) -> Iterable[PlaylistLink]:
         return list(self.downloading_links)
@@ -51,12 +59,6 @@ class Playlist(Downloadable):
 
     def get_dling_count(self) -> int:
         return self.dling_count
-
-    def set_deleted(self):
-        self.is_deleted = True
-
-    def is_deleted(self) -> bool:
-        return self.is_deleted
 
     def get_playlist_id(self) -> int:
         return self.playlist_id_property.get()
@@ -80,10 +82,37 @@ class Playlist(Downloadable):
         return self.status_property.get()
 
     def get_playlist_links(self) -> Iterable[PlaylistLink]:
+        return list(self.playlist_links)
+
+    def get_playlist_links_obervable_list(self) -> ObservableList[PlaylistLink]:
         return self.playlist_links
 
-    def get_playlist_links_obervable_list(self) -> ObservableList:
-        return self.playlist_links
+    def get_downloadable_type(self) -> DownloadableType:
+        return DownloadableType.PLAYLIST
+
+    def get_downloaded_bytes(self) -> int:
+        return sum(link.get_downloaded_bytes() for link in self.playlist_links)
+
+    def get_size_bytes(self) -> int:
+        return sum(link.get_size_bytes() for link in self.playlist_links)
+
+    def get_url_property(self) -> Property[str]:
+        return self.url_property
+
+    def get_status_property(self) -> Property[DataStatus]:
+        return self.status_property
+
+    def get_path_property(self) -> Property[str]:
+        return self.directory_path_property
+
+    def get_name_property(self) -> Property[str]:
+        return self.name_property
+
+    def get_size_property(self) -> Property[int]:
+        return self.size_property
+
+    def get_dl_speed_mbps_property(self) -> Property[float]:
+        return self.dl_speed_mbps_property
 
     def set_name(self, name: str):
         self.db_playlist.name = name
@@ -105,13 +134,8 @@ class Playlist(Downloadable):
         self.db_playlist.finished_at = timestamp
         self.finished_at_property.set(timestamp)
 
-    def _get_downloaded_bytes(self) -> int:
-        return sum(link.get_downloaded_bytes() for link in self.playlist_links)
-
-    def _get_size_bytes(self) -> int:
-        return sum(link.get_size_bytes() for link in self.playlist_links)
-
     def set_status(self, status: DataStatus):
+        self.db_playlist.status = status.value
         self.status_property.set(status)
 
     def add_playlist_link(self, pl_link: PlaylistLink):

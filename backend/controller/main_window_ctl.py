@@ -1,44 +1,48 @@
-from backend.controller.gui.view_changed_observer import ViewChangedObserver
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.controller.playlists_summary_ctl import PlaylistsSummaryController
+from backend.controller.view_changed_observer import ViewChangedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 from typing import List
+from backend.db.playlist_repo import PlaylistRepo
+from backend.model.account import Account
+from backend.model.playlist_links_fetcher import PlaylistLinksFetcher
 from backend.view.data_summary_box import DataSummaryBox
-from backend.controller.gui.new_playlist_ctl import NewPlaylistController
+from backend.controller.new_playlist_ctl import NewPlaylistController
 from backend.utils.commands.command import CallRcvrCommand
-from backend.controller.playlist_manager import PlaylistManager
-from backend.db.db_session import DBSession
 from backend.view.main_window import MainWindow
-from backend.controller.gui.data_summary_ctl import DataSummaryController
-from backend.controller.gui.view_changer import DataViewChanger
+from backend.controller.view_changer import DataViewChanger
 
 
 class MainWindowController(DataViewChanger):
-    def __init__(self, playlist_manager: PlaylistManager, db: DBSession):
-        self.playlist_mgr = playlist_manager
-        self.db = db
+    def __init__(self, repo: PlaylistRepo, account: Account,
+                 playlist_fetcher: PlaylistLinksFetcher):
+        self.repo = repo
+        self.account = account
+        self.playlist_fetcher = playlist_fetcher
         self.new_playlist_ctl = None
 
-        self.data_summary_ctl = DataSummaryController(self, self.playlist_mgr)
-        self.playlist_mgr.add_pl_modified_observer(self.data_summary_ctl)
-        self.data_view = self.data_summary_ctl.get_data_list_view()
-
-        self.view = MainWindow(self.data_view, self, CallRcvrCommand(
-            self._open_new_playlist_window), CallRcvrCommand(self._on_window_closed))
-
-        self.view_stack = [self.data_view]
-
-        self.data_view_changed_observers: List[ViewChangedObserver] = [
-            self.data_summary_ctl]
+        self.data_view_changed_observers: List[ViewChangedObserver] = []
         self.app_closed_observers: List[AppClosedObserver] = []
 
     def add_app_closed_observer(self, obs: AppClosedObserver):
         self.app_closed_observers.append(obs)
 
-    def show(self):
+    def add_view_changed_observer(self, obs: ViewChangedObserver):
+        self.data_view_changed_observers.append(obs)
+
+    def show(self, data_view: DataSummaryBox):
+        self.data_view = data_view
+
+        self.view = MainWindow(self.data_view, self, CallRcvrCommand(
+            self._open_new_playlist_window), CallRcvrCommand(self._on_window_closed))
+
+        self.view_stack = [self.data_view]
         self.view.show()
 
     def _open_new_playlist_window(self):
         self.new_playlist_ctl = NewPlaylistController(
-            self.playlist_mgr, CallRcvrCommand(lambda: self.view.setDisabled(False)))
+            self.account, self.repo, self.playlist_fetcher,
+            CallRcvrCommand(lambda: self.view.setDisabled(False)))
+
         self.view.setDisabled(True)
         self.new_playlist_ctl.show()
 

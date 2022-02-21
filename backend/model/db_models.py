@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, TIMESTAMP, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func, text
-from backend.model.downloadable import Downloadable
 
 Base = declarative_base()
 
@@ -15,7 +14,7 @@ merge_data_links = Table(
 )
 
 
-class DB_Playlist(Base, Downloadable):
+class DB_Playlist(Base):
     """Contains top-level info about playlist, name should be filename at which it should be saved,
     url should be of the form: https://www.youtube.com/watch?v=...&list=...
     """
@@ -32,7 +31,7 @@ class DB_Playlist(Base, Downloadable):
                          cascade="all, delete")
 
 
-class DB_PlaylistLink(Base, Downloadable):
+class DB_PlaylistLink(Base):
     """Info about specific playlist item, title will be used as filename"""
     __tablename__ = 'playlist_links'
     link_id = Column(Integer, primary_key=True, autoincrement=True)

@@ -9,7 +9,7 @@ from backend.subproc.ipc.message import Message, Messenger
 import multiprocessing as mp
 from backend.subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 import threading
 
 

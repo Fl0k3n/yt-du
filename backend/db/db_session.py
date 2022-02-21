@@ -1,9 +1,8 @@
-from typing import List
-from backend.model.db_models import Base, DB_DataLink, DB_Playlist, DB_PlaylistLink
-from backend.utils.assets_loader import AssetsLoader as AL
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.model.db_models import Base
+from backend.utils.assets_loader import AssetsLoader as AL
+from backend.controller.app_closed_observer import AppClosedObserver
 
 
 class DBSession(AppClosedObserver):

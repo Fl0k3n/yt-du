@@ -7,7 +7,7 @@ from backend.utils.property import Property
 class ScrollableLabel(QScrollArea):
     def __init__(self, parent: QWidget, w: int, h: int, text: str) -> None:
         super().__init__(parent=parent)
-        self.text_property = Property(text)
+        self.text_property = Property[str](text)
 
         self.text_property.add_property_changed_observer(
             callback=lambda _, new: self.setText(new))

@@ -16,21 +16,22 @@ class DataLink:
         self._setup_properties()
 
     def _setup_properties(self):
-        self.dlink_id_property = Property(self.db_dlink.link_id)
-        self.playlist_link_id_property = Property(
+        self.dlink_id_property = Property[int](self.db_dlink.link_id)
+        self.playlist_link_id_property = Property[int](
             self.db_dlink.playlist_link_id)
-        self.url_property = Property(self.db_dlink.url)
-        self.mime_property = Property(self.db_dlink.mime)
-        self.expire_property = Property(self.db_dlink.expire)
-        self.path_property = Property(self.db_dlink.path)
+        self.url_property = Property[str](self.db_dlink.url)
+        self.mime_property = Property[str](self.db_dlink.mime)
+        self.expire_property = Property[int](self.db_dlink.expire)
+        self.path_property = Property[str](self.db_dlink.path)
         # in bytes
-        self.size_property = Property(self.db_dlink.size)
+        self.size_property = Property[int](self.db_dlink.size)
         # in bytes
-        self.dled_size_property = Property(
+        self.dled_size_property = Property[int](
             self.db_dlink.downloaded)
-        self.dl_start_time_property = Property(
+        self.dl_start_time_property = Property[datetime](
             self.db_dlink.download_start_time)
-        self.last_chunk_url_property = Property(self.db_dlink.last_chunk_url)
+        self.last_chunk_url_property = Property[str](
+            self.db_dlink.last_chunk_url)
 
     def get_playlist_link(self) -> "PlaylistLink":
         return self.playlist_link

@@ -1,10 +1,12 @@
 from collections import deque
-from typing import Any, Callable, Iterable
+from typing import Callable, Iterable, Generic, TypeVar
 from backend.utils.property import Property
 
+T = TypeVar("T")
 
-class ObservableList:
-    def __init__(self, data: Iterable = None) -> None:
+
+class ObservableList(Generic[T]):
+    def __init__(self, data: Iterable[T] = None) -> None:
         self.items = deque(data) if data is not None else deque()
         self.size_property = Property(0)
         self.on_added_callbacks = []
@@ -13,22 +15,22 @@ class ObservableList:
     def get_size_property(self) -> Property:
         return self.size_property
 
-    def append(self, item: Any):
+    def append(self, item: T):
         self.items.append(item)
         self._append(item)
 
-    def append_front(self, item: Any):
+    def append_front(self, item: T):
         self.items.appendleft(item)
         self._append(item)
 
-    def remove(self, item: Any):
+    def remove(self, item: T):
         self.items.remove(item)
         self.size_property.set(len(self.items))
 
         for callback in self.on_removed_callbacks:
             callback(item)
 
-    def find(self, predicate: Callable[[Any], bool]) -> Any:
+    def find(self, predicate: Callable[[T], bool]) -> T:
         for item in self.items:
             try:
                 if predicate(item):
@@ -38,14 +40,14 @@ class ObservableList:
 
         return None
 
-    def _append(self, item: Any):
+    def _append(self, item: T):
         self.size_property.set(len(self.items))
 
         for callback in self.on_added_callbacks:
             callback(item)
 
-    def add_on_changed_observer(self, on_added_cb: Callable[[Any], None] = None,
-                                on_removed_cb: Callable[[Any], None] = None):
+    def add_on_changed_observer(self, on_added_cb: Callable[[T], None] = None,
+                                on_removed_cb: Callable[[T], None] = None):
         if on_added_cb is not None:
             self.on_added_callbacks.append(on_added_cb)
 
@@ -61,8 +63,11 @@ class ObservableList:
     def __str__(self) -> str:
         return str(list(self.items))
 
+    def __reversed__(self):
+        return self.items.__reversed__()
 
-# x = ObservableList()
+
+# x = ObservableList[int]()
 # x.append(1)
 # x.append(2)
 # x.append(3)

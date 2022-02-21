@@ -1,16 +1,15 @@
-from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
-import threading
-from backend.subproc.ipc.ipc_codes import DlCodes
+import multiprocessing as mp
+from collections import deque
 from multiprocessing.connection import Connection
-from backend.model.dl_task import DlTask
 from typing import Deque, Dict, Generator, List, Set
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
+from backend.subproc.ipc.ipc_codes import DlCodes
+from backend.model.dl_task import DlTask
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.subproc.ipc.message import DlData, Message, Messenger
-from collections import deque
-import multiprocessing as mp
 from backend.subproc.yt_dl import MediaURL, Resumer, YTDownloader
 from backend.subproc.ipc.piped_status_observer import PipedStatusObserver
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 from backend.subproc.ipc.stored_dl_task import StoredDlTask
 
 

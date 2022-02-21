@@ -3,8 +3,7 @@ from typing import Dict, List, Set
 from collections import defaultdict
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from backend.model.playlist import Playlist
-from backend.controller.gui.app_closed_observer import AppClosedObserver
-from backend.controller.observers.dl_speed_updated_observer import DlSpeedUpdatedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 
 
 class Timer(QObject):
@@ -37,8 +36,6 @@ class Speedo(AppClosedObserver):
 
         self.currently_tracked: Set[Playlist] = set()
 
-        self.dl_speed_obss: List[DlSpeedUpdatedObserver] = []
-
         self.timer_thread = QThread()
         self.timer = Timer(self._CLOCK_TICK)
         self.timer.moveToThread(self.timer_thread)
@@ -47,9 +44,6 @@ class Speedo(AppClosedObserver):
 
         self.timer.tick.connect(self._on_tick)
         self.timer_thread.start()
-
-    def add_dl_speed_observer(self, obs: DlSpeedUpdatedObserver):
-        self.dl_speed_obss.append(obs)
 
     def dl_stopped(self, playlist: Playlist):
         self.currently_tracked.remove(playlist)
@@ -72,8 +66,7 @@ class Speedo(AppClosedObserver):
     def _on_tick(self):
         for pl in self.currently_tracked:
             self.total_elapsed[pl] += self._CLOCK_TICK
-            for obs in self.dl_speed_obss:
-                obs.playlist_speed_updated(pl, self.get_avg_speed_MBps(pl))
+            pl.set_dl_speed_mbps(self.get_avg_speed_MBps(pl))
 
     def on_app_closed(self):
         self.timer.stop()

@@ -35,6 +35,10 @@ class DataSummaryBox(QFrame):
         # TODO
         self.show_all([item, *self.visible_widgets])
 
+    def append(self, item: DataListItem):
+        # TODO
+        self.show_all([*self.visible_widgets, item])
+
     def delete_item(self, item: DataListItem):
         # TODO
         self.show_all([x for x in self.visible_widgets if x != item])

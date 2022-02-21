@@ -22,6 +22,7 @@ class PlaylistLinksFetcher(PlaylistFetchedObserver):
         self.repo.update()
 
         self.ipc_mgr.query_playlist_links(playlist)
+        self.account.add_playlist(playlist)
 
     def on_playlist_fetched(self, playlist_id: int,
                             playlist_idxs: Iterable[int],
@@ -30,7 +31,7 @@ class PlaylistLinksFetcher(PlaylistFetchedObserver):
                             data_links: Iterable[Iterable[str]]):
         playlist = self.account.get_playlist_by_id(playlist_id)
 
-        if playlist.is_deleted():
+        if playlist is None:
             return
 
         playlist.set_status(DataStatus.WAIT_FOR_DL)

@@ -1,29 +1,32 @@
 import os
 from pathlib import Path
-from backend.model.db_models import DB_Playlist
-from backend.controller.playlist_manager import PlaylistManager
+from backend.db.playlist_repo import PlaylistRepo
+from backend.model.account import Account
+from backend.model.playlist_links_fetcher import PlaylistLinksFetcher
 from backend.utils.yes_no_dialog import YesNoDialog
 from backend.utils.commands.command import CallRcvrCommand, Command
 from backend.view.new_playlist_window import NewPlaylistWindow
 
 
 class NewPlaylistController:
-    def __init__(self, playlist_manager: PlaylistManager, on_view_closed: Command):
-        self.playlist_manager = playlist_manager
+    def __init__(self, account: Account, repo: PlaylistRepo,
+                 playlist_fetcher: PlaylistLinksFetcher, on_view_closed: Command):
+        self.account = account
+        self.repo = repo
+        self.playlist_fetcher = playlist_fetcher
         self.view = None
         self.on_view_closed = on_view_closed
 
     def _add_playlist(self, name: str, url: str, path: str):
-        playlist = DB_Playlist(name=name, url=url, directory_path=path)
 
-        stored = self.playlist_manager.get_playlist(url)
+        stored = self.account.get_playlist(url)
         if stored is not None:
-            msg = f'Playlist with that url was saved at {stored.directory_path}/{stored.name}' + \
-                f' at {stored.added_at}\nDo you want to download it again?'
+            msg = f'Playlist with that url was saved at {stored.get_path()}/{stored.get_name()}' + \
+                f' at {stored.get_added_at()}\nDo you want to download it again?'
 
             def clicked(accepted):
                 if accepted:
-                    self.playlist_manager.add_playlist(playlist)
+                    self._handle_accepted_playlist(name, url, path)
 
                 self._close_view()
 
@@ -33,8 +36,12 @@ class NewPlaylistController:
             self.view.setDisabled(True)
             ynd.show()
         else:
-            self.playlist_manager.add_playlist(playlist)
+            self._handle_accepted_playlist(name, url, path)
             self._close_view()
+
+    def _handle_accepted_playlist(self, name: str, url: str, path: str):
+        playlist = self.repo.create_playlist(name, url, path)
+        self.playlist_fetcher.fetch_playlist_links(playlist)
 
     def show(self):
         self.view = NewPlaylistWindow(self.on_view_closed, CallRcvrCommand(

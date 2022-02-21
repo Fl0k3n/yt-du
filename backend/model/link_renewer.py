@@ -2,12 +2,10 @@ from collections import defaultdict, deque
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.data_link import DataLink
 from backend.model.playlist_link import PlaylistLink
-from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
 from backend.model.link_fetched_observer import LinkFetchedObserver
 from typing import Deque, Dict, Iterable, Set, Tuple
 from backend.subproc.yt_dl import MediaURL, UnsupportedURLError, create_media_url
 from backend.subproc.ipc.ipc_manager import IPCManager
-from backend.db.db_session import DBSession
 
 
 class LinkRenewer(LinkFetchedObserver):

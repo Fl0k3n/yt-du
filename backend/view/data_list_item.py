@@ -11,7 +11,7 @@ from backend.view.scrollable_label import ScrollableLabel
 class DataListItem(QFrame):
     HEIGHT = 80
 
-    def __init__(self, parent: QWidget):
+    def __init__(self, parent: QWidget = None):
         super().__init__(parent)
 
         self._setup_default_properties()
@@ -43,11 +43,18 @@ class DataListItem(QFrame):
 
     def _setup_default_properties(self):
         # those properties should be public and bindable
-        self.url_property = Property("no url")
-        self.status_property = Property("no status")
-        self.directory_path_property = Property("no path")
-        self.is_pausable_property = Property(False)
-        self.is_resumable_property = Property(False)
+        self.url_property = Property[str]("no url")
+        self.status_property = Property[str]("no status")
+        self.directory_path_property = Property[str]("no path")
+        self.is_pausable_property = Property[bool](False)
+        self.is_resumable_property = Property[bool](False)
+        self.progress_status_property = Property[float](0)
+
+    def unbind_properties(self):
+        for property in (self.url_property, self.status_property,
+                         self.directory_path_property, self.is_pausable_property,
+                         self.is_resumable_property):
+            property.unbind_all()
 
     def _setup_status_label(self):
         self.status_label = ScrollableLabel(
@@ -67,6 +74,9 @@ class DataListItem(QFrame):
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedSize(150, 30)
+
+        self.progress_status_property.add_property_changed_observer(
+            callback=lambda _, new: self.update_progress_bar(new))
 
     def update_progress_bar(self, val: float):
         v = int(val * 100)
@@ -128,7 +138,7 @@ class DataListItem(QFrame):
 
         return super().mousePressEvent(a0)
 
-    def add_to_layout(self, items: Iterable[QWidget]):
+    def _add_to_layout(self, items: Iterable[QWidget]):
         for i, el in enumerate(items):
             self.layout.addWidget(el, 1, i + 1)
 

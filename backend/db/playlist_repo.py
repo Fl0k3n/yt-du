@@ -12,7 +12,7 @@ class PlaylistRepo:
         self.session = session
 
     def create_playlist(self, name: str, url: str, path: str) -> Playlist:
-        db_playlist = DB_Playlist(name=name, url=url, path=path)
+        db_playlist = DB_Playlist(name=name, url=url, directory_path=path)
         self._add(db_playlist)
         return Playlist(db_playlist)
 
@@ -32,7 +32,7 @@ class PlaylistRepo:
 
     def create_data_link(self, playlist_link: PlaylistLink, url: str, size: int, mime: str, expire: int) -> DataLink:
         db_data_link = DB_DataLink(
-            ulr=url, size=size, mime=mime, expire=expire)
+            url=url, size=size, mime=mime, expire=expire)
 
         db_data_link.link = playlist_link.db_link
         db_data_link.playlist_link_id = playlist_link.db_link.link_id

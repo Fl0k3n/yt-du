@@ -1,9 +1,9 @@
 import datetime
-from backend.controller.gui.app_closed_observer import AppClosedObserver
+from backend.controller.app_closed_observer import AppClosedObserver
 from backend.model.link_created_observer import LinkCreatedObserver
 from backend.model.link_renewer import LinkRenewer
 from backend.model.playlist_dl_manager import PlaylistDlManager
-from backend.controller.speedo import Speedo
+from backend.model.speedo import Speedo
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.account import Account
 from backend.model.data_link import DataLink
@@ -239,12 +239,6 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
     def _create_task(self, playlist_link: PlaylistLink) -> PlaylistLinkTask:
         return PlaylistLinkTask(playlist_link, self, self.link_renewer)
-
-    def delete_playlist(self, playlist: Playlist):
-        if playlist.get_status() == DataStatus.WAIT_FOR_FETCH:
-            playlist.set_deleted()
-
-        self.account.delete_playlist(playlist)
 
     def on_app_closed(self):
         for playlist in self.account.get_playlists():
