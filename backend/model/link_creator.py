@@ -1,3 +1,4 @@
+import logging
 from queue import Queue
 from backend.controller.app_closed_observer import AppClosedObserver
 from collections import defaultdict
@@ -74,6 +75,8 @@ class LinkCreator(AppClosedObserver):
         self.playlist_batches[playlist_link.playlist] += 1
 
         for dlink in dlinks:
+            logging.debug(
+                f'scheduling link creation task for {dlink} within {playlist_link}')
             self.creator_worker.add_task(Task(playlist_link, dlink))
 
     def _init_worker(self):
@@ -91,6 +94,8 @@ class LinkCreator(AppClosedObserver):
         pl_link = task.pl_link
 
         if pl_link.get_playlist().is_deleted():
+            logging.debug(
+                f'link created, but playlist was deleted, exiting. {pl_link}')
             return
 
         dlink = self.repo.create_data_link(
@@ -104,6 +109,7 @@ class LinkCreator(AppClosedObserver):
             all_done = self.playlist_batches[playlist] == 0
 
             self.not_ready.pop(pl_link)
+            logging.debug(f'link ready. {pl_link}')
             for obs in self.link_created_observers:
                 obs.on_link_created(pl_link, dlink, all_done)
 

@@ -1,3 +1,4 @@
+import logging
 from backend.view.scrollable_label import ScrollableLabel
 from backend.utils.commands.command import Command
 from PyQt5.QtWidgets import QDialog, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
@@ -59,15 +60,15 @@ class NewPlaylistWindow(QDialog):
             inner_layout.addWidget(btn)
 
     def _open_file_explorer(self):
-        dlg = QFileDialog(directory=self._DEFAULT_OUT_PATH)
-        dlg.setFileMode(QFileDialog.Directory)
-        dlg.setOption(QFileDialog.ShowDirsOnly)
-        if dlg.exec():
-            idk = dlg.selectedFiles()
-            if len(idk) > 1:
-                print('Only one file is required')
+        file_dialog = QFileDialog(directory=self._DEFAULT_OUT_PATH)
+        file_dialog.setFileMode(QFileDialog.Directory)
+        file_dialog.setOption(QFileDialog.ShowDirsOnly)
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            if len(selected_files) > 1:
+                logging.warn('Only one file is required')  # TODO
             else:
-                self.cur_path_label.setText(idk[0])
+                self.cur_path_label.setText(selected_files[0])
 
     def get_url(self) -> str:
         return self.url_input.text()

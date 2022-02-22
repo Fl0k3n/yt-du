@@ -1,3 +1,4 @@
+import logging
 from typing import Iterable
 from backend.model.link_creator import LinkCreator
 from backend.model.playlist import Playlist
@@ -17,6 +18,7 @@ class PlaylistLinksFetcher(PlaylistFetchedObserver):
         self.ipc_mgr = ipc_mgr
 
     def fetch_playlist_links(self, playlist: Playlist):
+        logging.debug(f'fetch requested for {playlist}')
         playlist.set_status(DataStatus.WAIT_FOR_FETCH)
         self.repo.update()
 
@@ -31,8 +33,11 @@ class PlaylistLinksFetcher(PlaylistFetchedObserver):
         playlist = self.account.get_playlist_by_id(playlist_id)
 
         if playlist is None:
+            logging.debug(
+                f'playlist with id={playlist_id} removed while fetching, ignoring')
             return
 
+        logging.debug(f'{playlist} links fetched, scheduling creation')
         playlist.set_status(DataStatus.WAIT_FOR_DL)
 
         pl_links = []

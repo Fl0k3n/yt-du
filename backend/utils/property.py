@@ -84,12 +84,19 @@ class Property(Generic[T]):
         return self
 
     def as_string(self) -> "Property[str]":
+        """Applies str() to this property, change of this property will
+         trigger change of returned property, change of returned property will NOT
+         trigger this to be changed"""
         prop = Property(str(self.value))
         self.add_property_changed_observer(
             callback=lambda old, new: prop.set(str(new)))
         return prop
 
     def mapped_as(self, mapper: Callable[[T], Any]) -> "Property[Any]":
+        """Applies mapper to this property, change of this property will
+         trigger change of returned property, change of returned property will NOT
+         trigger this to be changed"""
+
         prop = Property(mapper(self.value))
         self.add_property_changed_observer(
             callback=lambda old, new: prop.set(mapper(new)))

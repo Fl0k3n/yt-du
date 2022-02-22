@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Iterable, List
 from PyQt5.QtCore import Qt
 from PyQt5 import QtGui
@@ -97,7 +98,7 @@ class DataListItem(QFrame):
         self.menu.addAction('Open Location').triggered.connect(
             lambda: open_dir_in_explorer(
                 self.directory_path_property.get(),
-                CallRcvrCommand(lambda: print(f'{self.directory_path_property.get()} doesnt exist'))))
+                CallRcvrCommand(lambda: logging.warn(f'{self.directory_path_property.get()} doesnt exist'))))
 
         self.pause_action = self._create_pause_action(
         ) if self.is_pausable_property.get() else None
@@ -130,7 +131,7 @@ class DataListItem(QFrame):
 
     def add_menu_item(self, text: str, cmd: Command) -> QAction:
         if text not in self.extra_menu_actions:
-            self.extra_menu_actions[text] = self._create_action(text, cmd)
+            self.extra_menu_actions[text] = self._create_action(text, [cmd])
 
     def remove_menu_item(self, text: str):
         if text in self.extra_menu_actions:

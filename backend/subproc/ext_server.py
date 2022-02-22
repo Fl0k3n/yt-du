@@ -1,3 +1,4 @@
+import logging
 import asyncio
 import websockets
 import threading
@@ -37,7 +38,7 @@ class ExtServer:
             await stop
 
     def run(self):
-        print(f'WS server running at {self.ADDRESS}:{self.PORT}')
+        logging.info(f'WS server running at {self.ADDRESS}:{self.PORT}')
         self.listener = threading.Thread(
             target=self._listen_for_tasks, daemon=True)
         self.listener.start()
@@ -86,7 +87,7 @@ class ExtServer:
         return task
 
     async def _on_connected(self, ws, path):
-        print('-----------------------WS Connected-----------------')
+        logging.info('-----------------------WS Connected-----------------')
         with self.connection_mutex:
             self.connections.add(ws)
         while True:
@@ -96,6 +97,8 @@ class ExtServer:
                 if task.code in {ExtCodes.FETCH_PLAYLIST, ExtCodes.FETCH_LINK}:
                     await self._fetch_task(task, ws)
                 else:
+                    logging.critical(
+                        f'ext server got unexpected task code {task}')
                     raise RuntimeError('Unexpected task code', task)  # TODO
             except websockets.ConnectionClosed:
                 with self.connection_mutex:

@@ -1,8 +1,9 @@
-import threading
+import logging
 import os
+import threading
 from signal import SIGINT
 from typing import Any, Dict, Set, Tuple
-from backend.subproc.yt_dl import MediaURL, StatusObserver, create_media_url
+from backend.subproc.yt_dl import StatusCode, MediaURL, StatusObserver, create_media_url
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
@@ -56,6 +57,7 @@ class PipedStatusObserver(StatusObserver):
         if self.exiting:
             return False
 
+        logging.debug('asking for dl permission')
         self._send_dl_msg(DlCodes.CAN_PROCEED_DL, idx)
 
         with self.permission_lock:
@@ -71,7 +73,7 @@ class PipedStatusObserver(StatusObserver):
         msg = self._create_dl_msg(DlCodes.MERGE_STARTED, None)
         self.msger.send(self.conn, msg)
 
-    def merge_finished(self, status: int, stderr: str):
+    def merge_finished(self, status: StatusCode, stderr: str):
         msg = self._create_dl_msg(DlCodes.MERGE_FINISHED, (status, stderr))
         self.msger.send(self.conn, msg)
 
@@ -80,7 +82,7 @@ class PipedStatusObserver(StatusObserver):
         self.msger.send(self.conn, msg)
 
     def failed_to_init(self, exc_type: str, exc_msg: str):
-        print('[PIPED] init error')
+        logging.critical(f'[PIPED] init error {exc_type} | {exc_msg}')
 
     def dl_error_occured(self, idx: int, exc_type: str, exc_msg: str):
         self._send_dl_msg(DlCodes.DL_ERROR, (idx, exc_type, exc_msg))
@@ -97,7 +99,7 @@ class PipedStatusObserver(StatusObserver):
         while True:
             msg = self.msger.recv(self.conn)
             if msg.code == DlCodes.TERMINATE:
-                print('GOT TERMINATE MSG')
+                logging.info('ytdl worker got terminate message')
                 with self.exit_lock:
                     while self.exit_allowed_by < self.thread_count:
                         self.exit_allowed_cond.wait()
@@ -105,21 +107,25 @@ class PipedStatusObserver(StatusObserver):
 
                     with self.children_lock:
                         for pid in self.child_pids:
+                            logging.info(f'interrupting {pid} subprocess')
                             os.kill(pid, SIGINT)
-                        print('EXITING!!!!!!!')
+                        logging.info('ytdl worker exiting')
                         os._exit(0)  # TODO maybe use another exit method
             elif msg.code == DlCodes.DL_PERMISSION:
                 with self.permission_lock:
                     link_idx, perm = msg.data
                     self.dl_permissions[link_idx] = perm
                     self.dl_perm_cond.notify_all()
+                logging.debug(
+                    f'ytdl worker got permission to continue: {perm}')
             elif msg.code == DlCodes.URL_RENEWED:
+                logging.debug(f'ytdl worker got renewed links')
                 with self.renew_links_lock:
                     idx, media_url, is_consistent = msg.data
                     self.renewed_links[idx] = (media_url, is_consistent)
                     self.links_renewed_cond.notify_all()
             else:
-                print('rcvd unexpected msg:', msg)
+                logging.critical(f'ytdl worker rcvd unexpected msg: {msg}')
 
     def thread_started(self):
         self.thread_count += 1
@@ -127,6 +133,7 @@ class PipedStatusObserver(StatusObserver):
     def thread_finished(self):
         self.thread_count -= 1
         if self.thread_count < 1:
+            logging.critical('More threads exited that have been started')
             raise RuntimeError('More threads exited that have been started')
 
     def forbid_exit(self):

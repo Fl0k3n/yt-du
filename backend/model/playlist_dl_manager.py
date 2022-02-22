@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from backend.model.data_link import DataLink
 from backend.model.playlist_link import PlaylistLink
+from backend.subproc.yt_dl import StatusCode
 
 
 class PlaylistDlManager(ABC):
@@ -36,7 +37,7 @@ class PlaylistDlManager(ABC):
         pass
 
     @abstractmethod
-    def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
+    def on_merge_finished(self, playlist_link: PlaylistLink, status: StatusCode, stderr: str):
         pass
 
     @abstractmethod

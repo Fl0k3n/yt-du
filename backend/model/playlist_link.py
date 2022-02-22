@@ -183,6 +183,9 @@ class PlaylistLink(Downloadable):
             callback=lambda old, new: self.dled_size_property.set(
                 self.dled_size_property.get() - old + new))
 
+    def __str__(self) -> str:
+        return f'<[Playlist Link] name = {self.get_name()} | playlist = {self.playlist.get_name()} | status = {self.get_status()}>'
+
     # def __hash__(self):
     #     return hash(self.db_link.link_id)
 

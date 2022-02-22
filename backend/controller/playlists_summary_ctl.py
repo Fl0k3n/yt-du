@@ -1,3 +1,4 @@
+import logging
 from collections import deque
 from typing import Deque, Dict, List
 from backend.controller.data_list_items_factory import DataListItemsFactory
@@ -103,7 +104,7 @@ class PlaylistsSummaryController(ViewChangedObserver):
             playlist_link)
 
         list_item.add_show_details_command(
-            CallRcvrCommand(lambda: print("LINK DETAILS REQUESTED")))
+            CallRcvrCommand(lambda: logging.info("link details requested, no action implemented")))
 
         list_item.add_pause_command(CallRcvrCommand(
             self.playlist_dl_supervisor.on_link_pause_requested, playlist_link))

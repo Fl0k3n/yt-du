@@ -1,4 +1,5 @@
 import sys
+import logging
 from typing import List
 from PyQt5.QtWidgets import QApplication
 from backend.controller.data_list_items_factory import DataListItemsFactory
@@ -29,6 +30,7 @@ class App(QApplication):
             self.main_window_ctl.add_app_closed_observer(obs)
 
     def _setup_data_access_layer(self, sql_debug):
+        logging.info('setting up data access layer')
         self.db = DBSession(verbose=sql_debug)
         self.db.connect()
 
@@ -36,11 +38,13 @@ class App(QApplication):
         self.account = Account(self.repo)
 
     def _setup_ipc_layer(self):
+        logging.info('setting up ipc layer')
         self.ipc_manager = IPCManager()
         self.link_renewer = LinkRenewer(self.ipc_manager, self.repo)
         self.link_creator = LinkCreator(self.repo)
 
     def _setup_data_management_layer(self):
+        logging.info('setting up data management layer')
         self.speedo = Speedo()
 
         self.playlist_fetcher = PlaylistLinksFetcher(
@@ -65,6 +69,7 @@ class App(QApplication):
         self.ipc_manager.add_playlist_fetched_observer(self.playlist_fetcher)
 
     def run(self):
+        logging.info('starting GUI')
         self.main_window_ctl.show(
             self.playlist_summary_ctl.get_data_summary_view())
 
@@ -73,6 +78,8 @@ class App(QApplication):
 
 
 def main():
+    logger_format = '[%(filename)s:%(lineno)d] %(levelname)-8s %(message)s'
+    logging.basicConfig(level=logging.INFO, format=logger_format)
     app = App(sys.argv, sql_debug=False)
     app.run()  # blocking on main window
     app.stop()

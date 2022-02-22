@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from backend.model.db_models import Base
@@ -12,6 +13,7 @@ class DBSession(AppClosedObserver):
         self.session = None
 
     def connect(self):
+        logging.info('connecting to db...')
         username, password, address, name = [
             AL.get_env('DB_' + x) for x in ['USERNAME', 'PASSWORD', 'ADDRESS', 'NAME']]
 
@@ -22,6 +24,8 @@ class DBSession(AppClosedObserver):
         Base.metadata.create_all(self.engine)
 
         self.session = Session(self.engine)
+
+        logging.info('db connected')
 
     def get(self) -> Session:
         return self.session

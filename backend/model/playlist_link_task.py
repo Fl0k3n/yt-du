@@ -1,7 +1,8 @@
+import logging
 from typing import List
 from backend.model.playlist_link import PlaylistLink
 from backend.model.link_renewer import LinkRenewer
-from backend.subproc.yt_dl import MediaURL
+from backend.subproc.yt_dl import StatusCode, MediaURL
 from backend.model.playlist_dl_manager import PlaylistDlManager
 from backend.model.dl_task import DlTask
 
@@ -49,7 +50,7 @@ class PlaylistLinkTask(DlTask):
     def merge_started(self):
         self.pl_dl_mgr.on_merge_started(self.playlist_link)
 
-    def merge_finished(self, status: int, stderr: str):
+    def merge_finished(self, status: StatusCode, stderr: str):
         self.pl_dl_mgr.on_merge_finished(self.playlist_link, status, stderr)
 
     def process_finished(self, success: bool):
@@ -67,8 +68,8 @@ class PlaylistLinkTask(DlTask):
     def dl_error_occured(self, link_idx: int, exc_type: str, exc_msg: str):
         # TODO
         data_link = self.data_links[link_idx]
-        print(
-            f'[DL ERROR] for {data_link.get_playlist_link().get_name()} | mime {data_link.get_mime()} | exc_type {exc_type}')
+        logging.error(
+            f'[DL ERROR] for {data_link.get_playlist_link()} | {data_link} | exc_type = {exc_type} | error msg = {exc_msg}')
 
     def get_media_urls(self) -> List[str]:
         if not self.resumed:

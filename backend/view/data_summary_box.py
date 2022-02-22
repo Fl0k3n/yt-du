@@ -1,6 +1,6 @@
 from typing import Iterable
 from PyQt5 import Qt
-from PyQt5.QtWidgets import QFrame, QListWidgetItem, QScrollArea, QListWidget, QHBoxLayout, QVBoxLayout, QLabel, QWidget
+from PyQt5.QtWidgets import QFrame, QScrollArea, QVBoxLayout
 from backend.view.data_list_item import DataListItem
 
 
@@ -30,6 +30,8 @@ class DataSummaryBox(QFrame):
         for item in items:
             self.visible_widgets.append(item)
             self.inner_layout.addWidget(item)
+
+        self.scroll_area.verticalScrollBar().setSliderPosition(0)
 
     def append_top(self, item: DataListItem):
         # TODO

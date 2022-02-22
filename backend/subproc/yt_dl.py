@@ -14,6 +14,7 @@ Requirement: ffmpeg version 4.2.4 (not tested with other)
 OS: Unix only (tested on Ubuntu 20.04)
 Python: 3.8.10
 """
+import logging
 import sys
 import re
 import os
@@ -33,6 +34,15 @@ from enum import Enum
 PARENT_DIR = Path(__file__).parent.absolute()
 
 
+class StatusCode(Enum):
+    UNDEFINED = 0
+    FETCH_FAILED = 1
+    MERGE_FAILED = 2
+    SUCCESS = 3
+    DL_PERMISSION_DENIED = 4
+    INCONSISTENT_RENEW_LINKS = 5
+
+
 def _get_re_group(reg, data, idx, default):
     try:
         return re.search(reg, data).group(idx)
@@ -44,8 +54,7 @@ def try_del(name, func=os.remove, msg="Failed to cleanup"):
     try:
         func(name)
     except Exception as e:
-        print(msg)
-        print(type(e), e)
+        logging.exception(msg)
 
 
 class StatusObserver(ABC):
@@ -82,7 +91,7 @@ class StatusObserver(ABC):
         pass
 
     @abstractmethod
-    def merge_finished(self, status: int, stderr: str):
+    def merge_finished(self, status: StatusCode, stderr: str):
         pass
 
     @abstractmethod
@@ -584,58 +593,6 @@ def create_media_url(url: str, resumed: bool = False) -> MediaURL:
     raise UnsupportedURLError(url, msg="Failed to create MediaURL subclass")
 
 
-class CircularBuffer:
-    """For bytes only"""
-
-    def __init__(self, size, fill_val=b''):
-        self.size = size
-        self.fill_val = fill_val
-        self._empty_self()
-
-    def _empty_self(self):
-        self.buffer = [self.fill_val] * self.size
-        self.start = 0
-
-    def put(self, data):
-        # assumes len(data) < size
-        l = len(data)
-        to_write = min(self.size - self.start, l)
-        for i in range(to_write):
-            # data[i] converts it to int
-            self.buffer[self.start + i] = data[i:i+1]
-
-        left = l - to_write
-        for i in range(left):
-            self.buffer[i] = data[to_write + i: to_write + i + 1]
-
-        self.start = (self.start + l) % self.size
-
-    def get(self):
-        return self.buffer[self.start:] + self.buffer[:self.start]
-
-    def __str__(self):
-        return b''.join(self.get()).decode()
-
-    def flush(self):
-        data = self.get()
-        self._empty_self()
-        return data
-
-    def __eq__(self, other):
-        if type(other) == bytes:
-            return b''.join(self.get()) == other
-        return False
-
-
-class Codes(Enum):
-    UNDEFINED = 0
-    FETCH_FAILED = 1
-    MERGE_FAILED = 2
-    SUCCESS = 3
-    DL_PERMISSION_DENIED = 4
-    INCONSISTENT_RENEW_LINKS = 5
-
-
 class YTDownloader:
     try:
         from backend.utils.assets_loader import AssetsLoader as AL
@@ -731,7 +688,7 @@ class YTDownloader:
         if self.resumed and not self.resumer.should_resume_download():
             return
 
-        self.thread_status = [Codes.UNDEFINED] * len(self.data_links)
+        self.thread_status = [StatusCode.UNDEFINED] * len(self.data_links)
 
         self.threads = [threading.Thread(target=self._fetch, args=(link, media_url, file_name, i))
                         for i, (link, media_url, file_name) in enumerate(
@@ -743,7 +700,7 @@ class YTDownloader:
             self.status_obs.dl_started(idx, str(out_file_path))
 
         if self.verbose:
-            print(f"[{self.title}] Fetching: {link[:150]}...")
+            logging.debug(f"[{self.title}] Fetching: {link[:150]}...")
 
         tmp_file_path = f'{out_file_path}_{idx}'
 
@@ -771,16 +728,18 @@ class YTDownloader:
 
                         if r.headers['Content-Length'] == '0' and media_url.is_expired():
                             if self.status_obs is None:
-                                print(f'{link} has expired, aborting.')
-                                self.thread_status[idx] = Codes.FETCH_FAILED
+                                logging.warning(
+                                    f'{link} has expired, aborting.')
+                                self.thread_status[idx] = StatusCode.FETCH_FAILED
                                 try_del(tmp_file_path)
                                 return
                             media_url, is_consistent = self.status_obs.renew_link(idx,
                                                                                   media_url, last_successful)
 
                             if not is_consistent:
-                                print('links are inconsistent, aborting')
-                                self.thread_status[idx] = Codes.INCONSISTENT_RENEW_LINKS
+                                logging.warning(
+                                    'links are inconsistent, aborting')
+                                self.thread_status[idx] = StatusCode.INCONSISTENT_RENEW_LINKS
                                 try_del(tmp_file_path)
                                 return
 
@@ -797,7 +756,7 @@ class YTDownloader:
                                 tmp_f.write(chunk)
 
                         if self.status_obs is not None and not self.status_obs.can_proceed_dl(idx):
-                            self.thread_status[idx] = Codes.DL_PERMISSION_DENIED
+                            self.thread_status[idx] = StatusCode.DL_PERMISSION_DENIED
                             try_del(tmp_file_path)
                             return
 
@@ -823,25 +782,24 @@ class YTDownloader:
 
                         break
                     except Exception as e:
-                        print("Failed to fetch.")
-                        print(type(e), e)
+                        logging.exception("Failed to fetch.")
                         if self.status_obs is not None:
                             self.status_obs.dl_error_occured(idx,
                                                              type(e), repr(e))
 
                         if retried == self.retries:
-                            self.thread_status[idx] = Codes.FETCH_FAILED
+                            self.thread_status[idx] = StatusCode.FETCH_FAILED
                             try_del(tmp_file_path)
                             return
                         retried += 1
 
         try_del(tmp_file_path)
 
-        self.thread_status[idx] = Codes.SUCCESS
+        self.thread_status[idx] = StatusCode.SUCCESS
 
     def _merge_tmp_files(self, accept_all_msgs=True):
         if self.verbose:
-            print(f'[{self.title}] Merging.')
+            logging.debug(f'[{self.title}] Merging.')
 
         if self.status_obs is not None:
             self.status_obs.merge_started()
@@ -856,7 +814,6 @@ class YTDownloader:
         # TODO maybe higher-lvl api
 
         IN_ME, OUT_FMPEG = os.pipe()
-        # IN_FMPEG, OUT_ME = os.pipe()
 
         if self.status_obs is not None:
             self.status_obs.allow_subproc_start()
@@ -864,13 +821,11 @@ class YTDownloader:
         pid = os.fork()
         if pid == 0:
             os.close(IN_ME)
-            # os.close(OUT_ME)
 
             os.close(sys.stderr.fileno())
             os.close(sys.stdin.fileno())
 
             os.dup2(OUT_FMPEG, sys.stderr.fileno())
-            # os.dup2(IN_FMPEG, sys.stdin.fileno())
 
             os.execlp("ffmpeg", "ffmpeg", '-y' if accept_all_msgs else '-n',
                       *files, '-c', 'copy', '-strict', 'experimental', self.path)
@@ -879,31 +834,21 @@ class YTDownloader:
                 self.status_obs.subprocess_started(pid)
 
             os.close(OUT_FMPEG)
-            # os.close(IN_FMPEG)
-            # pattern = b'[y/N]'
-
-            # buffer = CircularBuffer(len(pattern))
             while True:
                 rd = os.read(IN_ME, 1)  # TODO
 
                 if rd == b'':
                     break
                 full_err_log.append(rd)
-            #     buffer.put(rd)
-
-            #     if pattern == buffer:
-            #         os.write(OUT_ME, b'y\n' if accept_all_msgs else b'N\n')
-            #         buffer.flush()
 
             os.close(IN_ME)
-            # os.close(OUT_ME)
 
             pid_, status = os.wait()
 
             if self.status_obs is not None:
                 self.status_obs.subprocess_finished(pid)
 
-            return Codes.SUCCESS if status == 0 else Codes.MERGE_FAILED, \
+            return StatusCode.SUCCESS if status == 0 else StatusCode.MERGE_FAILED, \
                 b''.join(full_err_log).decode()
 
     def _clean_up(self):
@@ -919,16 +864,16 @@ class YTDownloader:
                 (self.resumed and self.resumer.should_resume_download()):
             status = self._fetch_all()
 
-            if status == Codes.DL_PERMISSION_DENIED:
+            if status == StatusCode.DL_PERMISSION_DENIED:
                 return 0, 'DL PERMISSION DENIED'
-            if status == Codes.INCONSISTENT_RENEW_LINKS and self.cleanup:
+            if status == StatusCode.INCONSISTENT_RENEW_LINKS and self.cleanup:
                 # if they are inconsistent all of that data is most likely useless
                 # process should be run again with renewed links
                 self._clean_up()
         else:
-            status = Codes.SUCCESS
+            status = StatusCode.SUCCESS
 
-        if status == Codes.SUCCESS:
+        if status == StatusCode.SUCCESS:
             status, err_log = self._merge_tmp_files()
             if self.status_obs is not None:
                 self.status_obs.merge_finished(status, err_log)
@@ -938,18 +883,18 @@ class YTDownloader:
             # TODO
             return status, 'FAILED AT DL STAGE'
 
-        if status == Codes.SUCCESS and self.verbose:
-            print(f"[{self.title}] OK. Merged successfully.")
+        if status == StatusCode.SUCCESS and self.verbose:
+            logging.debug(f"[{self.title}] OK. Merged successfully.")
 
-        if status == Codes.SUCCESS and self.cleanup:
+        if status == StatusCode.SUCCESS and self.cleanup:
             self._clean_up()
 
         if self.status_obs is not None:
-            self.status_obs.process_finished(status == Codes.SUCCESS)
+            self.status_obs.process_finished(status == StatusCode.SUCCESS)
 
         return status, err_log
 
-    def _fetch_all(self) -> Codes:
+    def _fetch_all(self) -> StatusCode:
         for thread in self.threads:
             # possible race condition if called after
             if self.status_obs is not None:
@@ -959,7 +904,7 @@ class YTDownloader:
 
         t_start = time.time()
 
-        status = Codes.SUCCESS  # no errors yet
+        status = StatusCode.SUCCESS  # no errors yet
 
         permission_denied = False
         inconsitent_renew = False
@@ -971,42 +916,42 @@ class YTDownloader:
             if self.status_obs is not None:
                 self.status_obs.thread_finished()
 
-            if self.thread_status[i] == Codes.DL_PERMISSION_DENIED:
+            if self.thread_status[i] == StatusCode.DL_PERMISSION_DENIED:
                 permission_denied = True
                 # all threads have to be joined
                 continue
-            elif self.thread_status[i] == Codes.INCONSISTENT_RENEW_LINKS:
+            elif self.thread_status[i] == StatusCode.INCONSISTENT_RENEW_LINKS:
                 inconsitent_renew = True
                 continue
 
             if self.status_obs is not None:
                 self.status_obs.dl_finished(i)
 
-            if self.thread_status[i] not in {Codes.SUCCESS, Codes.DL_PERMISSION_DENIED}:
+            if self.thread_status[i] not in {StatusCode.SUCCESS, StatusCode.DL_PERMISSION_DENIED}:
                 status = self.thread_status[i]
-                print(
+                logging.info(
                     f"[{self.title}] Aborting, failed to download \n{self.data_links[i]}")
                 break
 
         if inconsitent_renew:
-            return Codes.INCONSISTENT_RENEW_LINKS
+            return StatusCode.INCONSISTENT_RENEW_LINKS
 
         if permission_denied:
-            print('dl permission denied, exiting')
+            logging.info('dl permission denied, exiting')
             if self.status_obs is not None:
                 self.status_obs.process_stopped()
-            return Codes.DL_PERMISSION_DENIED
+            return StatusCode.DL_PERMISSION_DENIED
 
         t_end = time.time()
 
-        if status == Codes.SUCCESS and self.verbose:
+        if status == StatusCode.SUCCESS and self.verbose:
             total_c_size = sum(media_url.get_size()
                                for media_url in self.media_urls)
 
             size = round(total_c_size / 1048576 * 100) / 100  # MB
             t_taken = round((t_end - t_start) * 100) / 100
 
-            print(
+            logging.info(
                 f"[{self.title}] Fetched successfully. SIZE: {size}MB TIME: {t_taken}s")
 
         return status
@@ -1019,6 +964,9 @@ def main():
             file=sys.stderr)
         sys.exit(1)
 
+    logger_format = '[%(filename)s:%(lineno)d] %(levelname)-8s %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=logger_format)
+
     path, link, title, data_link1, data_link2 = sys.argv[1:]
 
     ytdl = YTDownloader(path, link, [
@@ -1026,11 +974,10 @@ def main():
 
     status, err_log = ytdl.download()
 
-    if status != Codes.SUCCESS:
-        print('-'*20 + 'FAILED TO DOWNLOAD' + '-'*20)
-        print(err_log)
+    if status != StatusCode.SUCCESS:
+        logging.error('-'*20 + 'FAILED TO DOWNLOAD' + '-'*20 + f'\n{err_log}')
     else:
-        print(f'OK [{title}] downloaded successfully')
+        logging.info(f'OK [{title}] downloaded successfully')
 
     sys.exit(0)
 

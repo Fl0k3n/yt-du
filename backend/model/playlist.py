@@ -211,3 +211,6 @@ class Playlist(Downloadable):
             filename = f'{playlist_idx}_{filename}'
 
         return str(dir.joinpath(filename).absolute())
+
+    def __str__(self) -> str:
+        return f'<[Playlist] name = {self.get_name()} | status = {self.get_status()}>'

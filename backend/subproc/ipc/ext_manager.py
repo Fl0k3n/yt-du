@@ -1,3 +1,4 @@
+import logging
 import threading
 import urllib.parse as parse
 import multiprocessing as mp
@@ -40,6 +41,7 @@ class ExtManager(AppClosedObserver):
         self.link_fetched_cond = threading.Condition(self.link_fetch_lock)
 
     def start(self):
+        logging.info(f'starting extension server')
         self.ext_conn, child_conn = mp.Pipe(duplex=True)
         self.ext_proc = mp.Process(
             target=run_server, args=(child_conn,), daemon=True)
@@ -64,6 +66,8 @@ class ExtManager(AppClosedObserver):
             'db_id': playlist.get_playlist_id()
         }
 
+        logging.debug(f'requesting {ext_data} from extension')
+
         msg = Message(ExtCodes.FETCH_PLAYLIST, ext_data)
         self.msger.send(self.ext_conn, msg)
 
@@ -86,6 +90,9 @@ class ExtManager(AppClosedObserver):
         playlist_id = msg.data['echo']['data']['db_id']
         links_data = msg.data['links']
 
+        logging.info(f'got links for playlist = {playlist_id}')
+        logging.debug(f'data = {links_data}')
+
         playlist_idxs = [(self._get_playlist_idx(item['link']), i)
                          for i, item in enumerate(links_data)]
 
@@ -104,7 +111,7 @@ class ExtManager(AppClosedObserver):
         data = msg.data
         link = data['link']
         data_links = data['dataLinks']
-        print('got links', data_links)
+        logging.debug('got links', data_links)
 
         with self.link_fetch_lock:
             if link in self.blocking_link_queries:
@@ -120,20 +127,27 @@ class ExtManager(AppClosedObserver):
         still_alive = msg.data
         if still_alive == 0:
             # TODO
-            print('LOST ALL WS CONNECTIONS')
+            logging.warn('LOST ALL WS CONNECTIONS')
 
     def _on_conn_not_estb(self, msg: Message):
         # TODO
-        print('RCVD TASK BUT CONNECTION NOT ESTB')
+        logging.critical(
+            '{msg}\nEXTENSION HANDLER RCVD TASK BUT CONNECTION WITH BROWSER EXTENSION IS NOT ESTBABLISHED')
 
     def _get_playlist_idx(self, url: str):
         query = parse.urlparse(url).query
         return int(parse.parse_qs(query)['index'][0])
 
     def on_app_closed(self):
-        self.msger.send(self.ext_conn, Message(ExtCodes.TERMINATE))
+        logging.info('ext manager cleaning up..')
+        try:
+            self.msger.send(self.ext_conn, Message(ExtCodes.TERMINATE))
+        except OSError:
+            logging.exception("failed to send termination message")
+
         for obs in self.subproc_obss:
             obs.on_termination_requested(self.ext_proc, self.ext_conn)
+        logging.info('ext manager cleaned up, exiting')
 
     def query_link_blocking(self, playlist_link: PlaylistLink) -> List[str]:
         ext_data = {

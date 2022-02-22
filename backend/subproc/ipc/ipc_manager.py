@@ -1,3 +1,4 @@
+import logging
 import time
 import threading
 import multiprocessing as mp
@@ -20,6 +21,7 @@ from backend.subproc.ipc.dl_manager import DlManager
 
 
 class IPCListener(QObject):
+    """QT worker thread for handling IPC with subprocesses"""
     msg_rcvd = pyqtSignal(Message)
     conn_closed = pyqtSignal(Connection)
 
@@ -122,12 +124,13 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
         self.ext_manager.add_link_fetched_observer(obs)
 
     def _on_msg_rcvd(self, msg: Message):
-        print(f'MANAGER GOT [{msg.code}]')
+        logging.debug(f'MANAGER GOT [{msg.code}]')
         if msg.code in self.ext_codes:
             self.ext_manager.msg_rcvd(msg)
         elif msg.code in self.dl_codes:
             self.dl_manager.msg_rcvd(msg)
         else:
+            logging.critical(f'Unexpected IPC code msg: {msg}')
             raise AttributeError(f'Unexpected IPC code msg: {msg}')
 
     def _on_conn_closed(self, conn: Connection):
@@ -135,7 +138,7 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
         if conn in self.expected_dead_connections:
             self.expected_dead_connections.remove(conn)
         else:
-            print('UNEXPECTED DEAD CONNECTION')
+            logging.critical(f'unexpected dead connection {conn}, joining')
             self.conn_to_child[conn].join()
 
         self.conn_to_child.pop(conn)
@@ -159,13 +162,13 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
 
     def on_subproc_finished(self, process: mp.Process, con: Connection):
         # this is called when process finishes as expected
+        logging.debug('subprocess finished, joining')
         self.children.remove(process)
         self.expected_dead_connections.add(con)
 
         # conn will be removed on broken pipe
-        print('Joining process')
         process.join()
-        print('Joined')
+        logging.debug(f'subprocess joined successfully')
 
     def on_app_closed(self):
         for obs in self.app_closed_observers:
@@ -176,7 +179,7 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
 
         def kill_em_all():
             time.sleep(self._JOIN_CHILDREN_TIMEOUT)
-            print('JOINING')
+            logging.info(f'joining worker processes')
             to_rm = set()
             for proc in self.children:
                 if not proc.is_alive():
@@ -185,16 +188,20 @@ class IPCManager(SubprocLifetimeObserver, AppClosedObserver, LinkRenewedObserver
 
             self.children = self.children.difference(to_rm)
             if not self.children:
-                print('ALL JOINED')
+                logging.info('all workers joined the easy way')
                 return
 
+            logging.warn(
+                f'{len(self.children)} still alive waiting {self._KILL_CHILDREN_TIMEOUT} before killing')
+
             time.sleep(self._KILL_CHILDREN_TIMEOUT)
-            print('TERMINATING')
             for proc in self.children:
                 if proc.is_alive():
-                    print('CHILD IS STILL ALIVE')
+                    logging.critical(f'terminating child')
                     proc.terminate()
                 proc.join()
+
+            logging.info(f'ipc mgr: all workers cleaned up')
 
         threading.Thread(target=kill_em_all).start()
 

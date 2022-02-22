@@ -1,3 +1,4 @@
+import logging
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.connection import Connection
@@ -66,6 +67,7 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
                 self.paused_tasks.remove(task)
 
     def _start_download(self, s_task: StoredDlTask):
+        logging.debug(f'starting download of {s_task}')
         task = s_task.task
 
         url = task.get_url()
@@ -81,6 +83,8 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
             path, url, dlink1, dlink2, child_con,
             s_task.task_id, task.is_resumed(), task.get_resumer()))
         proc.start()
+
+        logging.debug(f'dl subprocess for {s_task} started')
 
         self.running_tasks.add(s_task)
         self.total_tasks_started += 1
@@ -148,6 +152,7 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
             obs.on_subproc_finished(process, connection)
 
     def _on_process_finished(self, dl_data: DlData):
+        logging.debug(f'process for {dl_data} finished')
         success = dl_data.data
         task = self._get_task(dl_data)
         task.process_finished(success)
@@ -155,16 +160,15 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
 
         self._clean_process_task(tid)
 
-        print('*'*100)
-        print(
+        logging.debug(
             f'TOTAL TASKS STARTED: {self.total_tasks_started} \
             PROC LEN IS {len(self.processes)} QUEUE LEN IS {len(self.task_queue)}')
-        print('*'*100)
 
         self._check_queue()
 
     def _on_process_stopped(self, dl_data: DlData):
         # rcvd after process was paused
+        logging.debug(f'process for {dl_data} stopped')
         task = self._get_task(dl_data)
         task.process_stopped()
 
@@ -173,6 +177,7 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
         self._check_queue()
 
     def _on_url_expired(self, dl_data: DlData):
+        logging.debug(f'urls for {dl_data} expired, requesting renewal')
         task = self._get_task(dl_data)
         link_idx, media_url, last_successful = dl_data.data
         task.renew_link(dl_data.task_id, link_idx, media_url, last_successful)
@@ -202,11 +207,15 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
         return self.tasks[dl_data.task_id].task
 
     def on_app_closed(self):
+        logging.info(f'dl manager cleaning up...')
+
         self.task_queue.clear()
         for tid, conn in self.connections.items():
             self.msger.send(conn, Message(DlCodes.TERMINATE))
             for obs in self.subproc_obss:
                 obs.on_termination_requested(self.processes[tid], conn)
+
+        logging.info(f'dl manager cleaned up, exiting')
 
     def pause_task(self, tid: int) -> bool:
         """returns True if task was running """
@@ -219,9 +228,10 @@ class DlManager(AppClosedObserver, LinkRenewedObserver):
                 return False
             return True
         except KeyError:
-            print(f'Task {tid} is already finished')
+            logging.error(f'Task {tid} is already finished')
 
     def on_link_renewed(self, task_id: int, link_idx: int, renewed: MediaURL, is_consistent: bool):
+        logging.debug(f'{task_id} link got renewed, sending it to worker')
         conn = self.connections[task_id]
         resp_msg = Message(DlCodes.URL_RENEWED,
                            (link_idx, renewed, is_consistent))

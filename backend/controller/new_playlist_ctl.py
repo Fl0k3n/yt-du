@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.account import Account
@@ -54,8 +55,8 @@ class NewPlaylistController:
         url = self.view.get_url()
         path = self.view.get_path()
 
-        if not url.startswith('http'):
-            print('BAD URL')  # TODO
+        if not url.startswith('http') or 'youtube' not in url:
+            logging.warning(f'invalid url: {url}')  # TODO
             return
 
         out_path = str(Path(path).joinpath(name).absolute())
@@ -63,9 +64,10 @@ class NewPlaylistController:
         try:
             os.mkdir(out_path)
         except FileExistsError:
-            print('possibly going to overwrite')
-        except Exception as e:
-            print('Failed to create directory', e)
+            logging.warning(
+                f'requested path exists ({out_path}), possibly going to overwrite')  # TODO
+        except Exception:
+            logging.exception('Failed to create directory')
             return
 
         self._add_playlist(name, url, out_path)

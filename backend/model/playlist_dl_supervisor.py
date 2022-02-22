@@ -1,3 +1,4 @@
+import logging
 import datetime
 from backend.controller.app_closed_observer import AppClosedObserver
 from backend.model.link_created_observer import LinkCreatedObserver
@@ -13,6 +14,7 @@ from backend.model.playlist_link import PlaylistLink
 from backend.model.playlist_link_task import PlaylistLinkTask
 from backend.subproc.ipc.ipc_manager import IPCManager
 from backend.subproc.pl_link_resumer import PlaylistLinkResumer
+from backend.subproc.yt_dl import StatusCode
 
 
 class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClosedObserver):
@@ -31,6 +33,9 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
     def on_link_created(self, playlist_link: PlaylistLink, data_link: DataLink, playlist_rdy: bool):
         if playlist_rdy:
+            logging.debug(
+                f'playlist links ready for dl, requesting scheduler for {playlist_link.get_playlist()}')
+
             playlist = playlist_link.get_playlist()
 
             for pl_link in playlist.get_playlist_links():
@@ -39,7 +44,9 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
                 pl_link.set_dl_task_id(task_id)
 
     def on_process_started(self, playlist_link: PlaylistLink, tmp_files_dir: str):
-        print('DL PROCESS STARTED FOR ', playlist_link.get_name())
+        logging.info(f'dl subprocess started for {playlist_link}')
+        logging.debug(f'setting tmp files directory to {tmp_files_dir}')
+
         playlist_link.set_tmp_files_dir_path(tmp_files_dir)
 
         if playlist_link.is_resume_requested():
@@ -51,11 +58,16 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         self.repo.update()
 
     def on_dl_started(self, playlist_link: PlaylistLink, data_link: DataLink, abs_path: str):
+        logging.debug(
+            f'dl started for {data_link} in {playlist_link}, saving at {abs_path}')
+
         playlist = playlist_link.get_playlist()
         first_link = False
         first_data_link = False
 
         if playlist_link.get_status() != DataStatus.DOWNLOADING:
+            logging.debug(
+                f'got first link in {playlist_link}, setting status as consistent')
             playlist_link.set_link_dling_count(1)
             playlist_link.set_status(DataStatus.DOWNLOADING)
             self.link_renewer.set_consistent(playlist_link, True)
@@ -67,6 +79,8 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         # wont be called if count drops to 0 then gets resumed
         if first_data_link:
             if playlist.get_status() != DataStatus.DOWNLOADING:
+                logging.debug(
+                    f'got first link in {playlist}, playlist DL started')
                 playlist.set_dling_count(1)
                 playlist.set_status(DataStatus.DOWNLOADING)
                 first_link = True
@@ -77,10 +91,8 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         data_link.set_path(abs_path)
         self.repo.update()
 
-        if first_data_link:
-            print('DL STARTED for ', playlist_link.get_name())
-
         if first_link or playlist.get_dling_count() == 1:
+            logging.debug(f'{playlist} resumed, resuming speedo')
             self.speedo.dl_resumed(playlist)
 
     def can_proceed_dl(self, playlist_link: PlaylistLink, data_link: DataLink) -> bool:
@@ -90,6 +102,8 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
     def on_dl_progress(self, playlist_link: PlaylistLink,
                        data_link: DataLink, expected_bytes_to_fetch: int,
                        bytes_fetched: int, chunk_url: str):
+        logging.debug(
+            f'dl progress for {playlist_link} got {bytes_fetched}B chunk')
         size_diff = bytes_fetched - expected_bytes_to_fetch
 
         data_link.set_size(data_link.get_size() + size_diff)
@@ -101,45 +115,50 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         self.speedo.dl_progressed(playlist_link.get_playlist(), bytes_fetched)
 
     def on_data_link_dled(self, playlist_link: PlaylistLink, data_link: DataLink):
-        print(
-            f'finished downloading {data_link.get_mime()} for {playlist_link.get_name()}')
+        logging.debug(
+            f'finished downloading {data_link} for link {playlist_link}')
+
         playlist_link.set_link_dling_count(
             playlist_link.get_link_dling_count() - 1)
 
     def on_link_dled(self, playlist_link: PlaylistLink):
+        logging.debug(
+            f'all streams of {playlist_link} downloaded, waiting for merge')
+
         playlist = playlist_link.get_playlist()
         playlist.set_dling_count(playlist.get_dling_count() - 1)
         playlist_link.set_status(DataStatus.WAIT_FOR_MERGE)
         self.repo.update()
 
         if playlist.get_dling_count() == 0:
+            logging.debug(f'{playlist} downloaded, stopping speedo')
             self.speedo.dl_stopped(playlist)
 
     def on_merge_started(self, playlist_link: PlaylistLink):
+        logging.debug(f'merge started for {playlist_link}')
         playlist_link.set_status(DataStatus.MERGING)
         self.repo.update()
 
-    def on_merge_finished(self, playlist_link: PlaylistLink, status: int, stderr: str):
+    def on_merge_finished(self, playlist_link: PlaylistLink, status: StatusCode, stderr: str):
         # TODO
-        if status != 0:
+        if status != StatusCode.SUCCESS:
             playlist_link.set_status(DataStatus.ERRORS)
             self.repo.update()
-            print(
-                f'link {playlist_link.get_name()} | {playlist_link.get_url()} FAILED')
-            print('*'*80)
-            print(stderr)
-            print('*'*80)
+            logging.error(f'{playlist_link} merge FAILED status = {status}')
+            logging.debug(f'ffmpeg stderr: {stderr}')
 
     def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
         # TODO
         if playlist_link.get_playlist().is_deleted():
+            logging.debug(
+                f'process for {playlist_link} finished but playlist was deleted, ignoring')
             return
 
         old_status = playlist_link.get_status()
 
         if not success and old_status == DataStatus.WAIT_FOR_MERGE:  # fail on dl stage
             # TODO
-            print('Failed on dl stage, retrying')
+            logging.error(f'{playlist_link} failed on dl stage, retrying')
             for dlink in playlist_link.get_data_links():
                 dlink.set_dled_size(0)
                 dlink.set_last_chunk_url(None)
@@ -152,6 +171,7 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
             playlist_link.set_dl_task_id(task_id)
         else:
             # TODO handle failure on other stage
+            logging.info(f'{playlist_link} successfully downloaded and merged')
             playlist_link.set_status(DataStatus.FINISHED)
             playlist_link.set_cleaned_up(True)
 
@@ -163,15 +183,21 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
             if not self.link_renewer.is_consistent(playlist_link):
                 self._handle_inconsistent(playlist_link)
             elif playlist.is_finished():
+                logging.info(f'{playlist} finished successfully')
                 playlist.set_status(DataStatus.FINISHED)
                 playlist.set_finished_at(datetime.datetime.now())
                 self.repo.update()
             elif playlist.is_paused():
+                logging.info(
+                    f'all links for {playlist} finished, playlist paused')
                 playlist.set_status(DataStatus.PAUSED)
                 self.repo.update()
 
     def _handle_inconsistent(self, playlist_link: PlaylistLink):
         # called when process downloading inconsistent link finishes
+        logging.debug(
+            f'{playlist_link} was incosistent, retrying with fresh data links')
+
         playlist_link.set_tmp_files_dir_path(None)
         playlist_link.set_status(DataStatus.WAIT_FOR_DL)
 
@@ -188,6 +214,7 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         playlist_link.set_dl_task_id(task_id)
 
     def on_process_paused(self, playlist_link: PlaylistLink):
+        logging.debug(f'{playlist_link} paused')
         playlist_link.set_dl_task_finished()
         playlist_link.set_link_dling_count(0)
 
@@ -205,20 +232,22 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         playlist = playlist_link.get_playlist()
 
         if playlist.is_paused():
+            logging.debug(
+                f'all {playlist} links paused, setting playlist status as paused')
             playlist.set_status(DataStatus.PAUSED)
             playlist.set_pause_requested(False)
 
         self.repo.update()
 
     def on_playlist_pause_requested(self, playlist: Playlist):
-        print(f'pause requested for {playlist.get_name()}')
+        logging.debug(f'pause requested for {playlist}')
         playlist.set_pause_requested(True)
 
         for link in playlist.get_downloading_links():
             self.on_link_pause_requested(link)
 
     def on_link_pause_requested(self, playlist_link: PlaylistLink) -> bool:
-        print(f'pause requested for link {playlist_link.get_name()}')
+        logging.debug(f'pause requested for link {playlist_link}')
         running = self.ipc_mgr.pause_dl(playlist_link.get_dl_task_id())
         playlist_link.set_pause_requested(True)
 
@@ -228,11 +257,11 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         return running
 
     def on_link_resume_requested(self, playlist_link: PlaylistLink):
-        print(f'resume requested for link {playlist_link.get_name()}')
+        logging.debug(f'resume requested for link {playlist_link}')
         self._resume_link(playlist_link)
 
     def on_playlist_resume_requested(self, playlist: Playlist):
-        print(f'resume requested for {playlist.get_name()}')
+        logging.debug(f'resume requested for {playlist}')
         playlist.set_resume_requested(True)
 
         for link in playlist.get_playlist_links():
@@ -241,6 +270,7 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
     def _resume_link(self, playlist_link: PlaylistLink):
         playlist_link.set_resume_requested(True)
+        logging.info(f'scheduling resuming task for {playlist_link}')
 
         resumer = PlaylistLinkResumer(playlist_link)
         task = self._create_task(playlist_link)
@@ -256,11 +286,13 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         playlist.set_deleted()
 
         if playlist.is_downloading() and not playlist.is_pause_requested():
+            logging.debug(f'{playlist} deleted while downloading, pausing all')
             self.on_playlist_pause_requested(playlist)
 
     def on_app_closed(self):
+        logging.debug(f'dl supervisor cleaning playlists...')
         for playlist in self.account.get_playlists():
             playlist.force_pause()
 
         self.repo.update()
-        # self.db.on_app_closed() TODO
+        logging.debug(f'dl supervisor cleaned up')

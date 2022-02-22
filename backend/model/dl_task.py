@@ -1,7 +1,7 @@
 from typing import List
 from abc import ABC, abstractmethod
 from backend.model.data_link import DataLink
-from backend.subproc.yt_dl import MediaURL, Resumer
+from backend.subproc.yt_dl import StatusCode, MediaURL, Resumer
 
 
 class DlTask(ABC):
@@ -59,7 +59,7 @@ class DlTask(ABC):
         pass
 
     @abstractmethod
-    def merge_finished(self, status: int, stderr: str):
+    def merge_finished(self, status: StatusCode, stderr: str):
         pass
 
     @abstractmethod

@@ -97,3 +97,6 @@ class DataLink:
     def set_last_chunk_url(self, url: str):
         self.db_dlink.last_chunk_url = url
         self.last_chunk_url_property.set(url)
+
+    def __str__(self) -> str:
+        return f'<[Data Link] mime = {self.get_mime()} | downloaded = {self.dled_size_property.get()} | path = {self.get_path()}>'

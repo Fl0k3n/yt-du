@@ -1,6 +1,6 @@
 console.log('YTDU backgroud.js loaded');
 
-const PORT = 5555;
+const PORT = 5568;
 
 const HREFS_CODE = 1; // match with content.js codes
 
@@ -26,7 +26,7 @@ const CODES = {
 
 // TODO retries....
 class ConnectionHandler {
-    constructor(port = 5552, retries = 3000000, connTimeout = 1, pingTime = 1) {
+    constructor(port = PORT, retries = 3000000, connTimeout = 1, pingTime = 1) {
         this.PORT = port;
         this.START_CON_TIMEOUT = connTimeout;
         this.socket = null;

@@ -13,3 +13,6 @@ class StoredDlTask:
 
     def __hash__(self) -> int:
         return hash(self.task_id)
+
+    def __str__(self) -> str:
+        return f'[TASK {self.task_id}] {self.task}'

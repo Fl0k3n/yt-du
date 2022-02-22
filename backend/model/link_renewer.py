@@ -1,9 +1,10 @@
+import logging
 from collections import defaultdict, deque
+from typing import Deque, Dict, Iterable, Set, Tuple
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.data_link import DataLink
 from backend.model.playlist_link import PlaylistLink
 from backend.model.link_fetched_observer import LinkFetchedObserver
-from typing import Deque, Dict, Iterable, Set, Tuple
 from backend.subproc.yt_dl import MediaURL, UnsupportedURLError, create_media_url
 from backend.subproc.ipc.ipc_manager import IPCManager
 
@@ -77,9 +78,12 @@ class LinkRenewer(LinkFetchedObserver):
             try:
                 old.renew(renewed, last_successful)
                 renewed = old
-            except UnsupportedURLError as e:
-                print('Failed to renew url', e)
+            except UnsupportedURLError:
+                logging.exception(f'Failed to renew url for {playlist_link}')
                 is_consistent = False
+
+        logging.debug(
+            f'link for {playlist_link} renewed successfully consistent={is_consistent}')
 
         data_link.set_url(renewed.get_raw_url())
         data_link.set_expire_timestamp(renewed.get_expire_time())

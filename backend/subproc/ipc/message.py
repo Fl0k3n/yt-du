@@ -24,6 +24,9 @@ class Message:
         data = json.loads(json_data)
         return Message(enum_type(data['code']), data['data'])
 
+    def __str__(self) -> str:
+        return self.to_json()
+
 
 class DlData:
     def __init__(self, task_id: int, data: Any = None):
