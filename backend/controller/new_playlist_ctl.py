@@ -43,9 +43,10 @@ class NewPlaylistController:
         playlist = self.repo.create_playlist(name, url, path)
         self.playlist_fetcher.fetch_playlist_links(playlist)
 
-    def show(self):
-        self.view = NewPlaylistWindow(self.on_view_closed, CallRcvrCommand(
+    def show(self, x: int, y: int):
+        self.view = NewPlaylistWindow(x, y, self.on_view_closed, CallRcvrCommand(
             lambda: self._on_playlist_add_requested()))
+
         self.view.show()
 
     def _on_playlist_add_requested(self):

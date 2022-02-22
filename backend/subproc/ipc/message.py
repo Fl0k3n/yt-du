@@ -1,7 +1,7 @@
-from typing import Any
-from multiprocessing.connection import Connection
-from enum import Enum
 import json
+from typing import Any
+from enum import Enum
+from multiprocessing.connection import Connection
 
 
 class Message:

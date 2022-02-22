@@ -1,5 +1,4 @@
 from backend.utils.commands.command import Command
-from typing import Any, Callable
 from PyQt5.QtWidgets import QFrame, QPushButton, QVBoxLayout
 
 

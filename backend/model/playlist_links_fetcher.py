@@ -1,4 +1,3 @@
-
 from typing import Iterable
 from backend.model.link_creator import LinkCreator
 from backend.model.playlist import Playlist

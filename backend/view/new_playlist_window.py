@@ -7,11 +7,14 @@ from PyQt5.QtCore import Qt
 
 class NewPlaylistWindow(QDialog):
     _DEFAULT_OUT_PATH = AL.get_env('DEFAULT_OUT_PATH')
+    _WIDTH = 600
+    _HEIGHT = 400
 
-    def __init__(self, on_view_closed: Command, on_accepted: Command):
+    def __init__(self, x: int, y: int, on_view_closed: Command, on_accepted: Command):
         super().__init__()
         self.on_view_closed = on_view_closed
-        self.setGeometry(200, 200, 400, 400)
+        self.setGeometry(x - self._WIDTH // 2, y -
+                         self._HEIGHT // 2, self._WIDTH, self._HEIGHT)
 
         self.layout = QVBoxLayout(self)
 
@@ -40,12 +43,6 @@ class NewPlaylistWindow(QDialog):
         self.url_input, self.name_input = self.inputs
 
         path_btn.clicked.connect(self._open_file_explorer)
-
-        # OWN
-        # self.url_input.setText(
-        #     'https://www.youtube.com/watch?v=8xH0sdjMINY&list=PL-wtbH6CyQQZIkOpf2yWjfp_EL9R52olh&index=1')
-        # self.name_input.setText('OWN TEST')
-        # self.path_input.setText('/home/flok3n/music')
 
         btn_box = QWidget()
         self.layout.addWidget(btn_box)

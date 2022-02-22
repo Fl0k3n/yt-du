@@ -22,7 +22,7 @@ class ViewStackItem:
 
 
 class PlaylistsSummaryController(ViewChangedObserver):
-    _BOX_WIDTH, _BOX_HEIGHT = 700, 600
+    _BOX_WIDTH, _BOX_HEIGHT = 850, 700
     _DELETE_PL_MENU_NAME = 'Delete Entry'
 
     def __init__(self, account: Account,
@@ -64,13 +64,13 @@ class PlaylistsSummaryController(ViewChangedObserver):
     def _add_playlist(self, playlist: Playlist):
         list_item = self.list_items_factory.create_data_list_item(playlist)
 
-        list_item.set_show_details_command(CallRcvrCommand(
+        list_item.add_show_details_command(CallRcvrCommand(
             self._show_playlist_details, playlist))
 
-        list_item.set_pause_command(CallRcvrCommand(
+        list_item.add_pause_command(CallRcvrCommand(
             self.playlist_dl_supervisor.on_playlist_pause_requested, playlist))
 
-        list_item.set_resume_command(CallRcvrCommand(
+        list_item.add_resume_command(CallRcvrCommand(
             self.playlist_dl_supervisor.on_playlist_resume_requested, playlist))
 
         list_item.add_menu_item(self._DELETE_PL_MENU_NAME, CallRcvrCommand(
@@ -94,24 +94,22 @@ class PlaylistsSummaryController(ViewChangedObserver):
             stack_top.view.append(new_link)
 
     def _on_playlist_deleted(self, playlist: Playlist):
-        print('called back')
         playlist_view = self.playlist_to_list_item.pop(playlist)
         self.visible_playlists.remove(playlist_view)
         self.playlists_view.delete_item(playlist_view)
-        print("OK")
 
     def _add_link(self, playlist_link: PlaylistLink) -> LinkListItem:
         list_item = self.list_items_factory.create_data_list_item(
             playlist_link)
 
-        list_item.set_show_details_command(
+        list_item.add_show_details_command(
             CallRcvrCommand(lambda: print("LINK DETAILS REQUESTED")))
 
-        list_item.set_pause_command(CallRcvrCommand(
-            self.playlist_dl_supervisor.on_link_resume_requested, playlist_link))
-
-        list_item.set_resume_command(CallRcvrCommand(
+        list_item.add_pause_command(CallRcvrCommand(
             self.playlist_dl_supervisor.on_link_pause_requested, playlist_link))
+
+        list_item.add_resume_command(CallRcvrCommand(
+            self.playlist_dl_supervisor.on_link_resume_requested, playlist_link))
 
         return list_item
 

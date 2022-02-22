@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from multiprocessing.connection import Connection
 from multiprocessing import Process
+from multiprocessing.connection import Connection
 
 
 class SubprocLifetimeObserver(ABC):

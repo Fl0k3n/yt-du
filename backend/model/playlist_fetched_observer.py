@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 from typing import Iterable
+from abc import ABC, abstractmethod
 
 
 class PlaylistFetchedObserver(ABC):

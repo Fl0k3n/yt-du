@@ -1,4 +1,3 @@
-
 from typing import Iterable
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.playlist import Playlist

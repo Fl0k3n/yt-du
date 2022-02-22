@@ -1,20 +1,20 @@
-from backend.model.playlist import Playlist
-from backend.model.playlist_link import PlaylistLink
-from backend.subproc.yt_dl import MediaURL
-from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
-from backend.model.link_fetched_observer import LinkFetchedObserver
 import time
 import threading
 import multiprocessing as mp
+from typing import Dict, List, Set
+from multiprocessing.connection import Connection, wait
+from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
+from backend.model.playlist import Playlist
+from backend.model.dl_task import DlTask
+from backend.subproc.yt_dl import MediaURL
+from backend.model.playlist_link import PlaylistLink
+from backend.subproc.ipc.link_renewed_observer import LinkRenewedObserver
+from backend.model.link_fetched_observer import LinkFetchedObserver
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.controller.app_closed_observer import AppClosedObserver
-from backend.model.dl_task import DlTask
 from backend.model.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.subproc.ipc.ipc_codes import ExtCodes, DlCodes
-from multiprocessing.connection import Connection, wait
-from typing import Dict, List, Set
 from backend.subproc.ipc.message import Message, Messenger
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, QWaitCondition, QMutex
 from backend.subproc.ipc.ext_manager import ExtManager
 from backend.subproc.ipc.dl_manager import DlManager
 

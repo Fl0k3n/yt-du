@@ -183,10 +183,10 @@ class PlaylistLink(Downloadable):
             callback=lambda old, new: self.dled_size_property.set(
                 self.dled_size_property.get() - old + new))
 
-    def __hash__(self):
-        return hash(self.db_link.link_id)
+    # def __hash__(self):
+    #     return hash(self.db_link.link_id)
 
-    def __eq__(self, other):
-        if type(self) == type(other):
-            return self.db_link.link_id == other.db_link.link_id
-        return False
+    # def __eq__(self, other):
+    #     if type(self) == type(other):
+    #         return self.db_link.link_id == other.db_link.link_id
+    #     return False

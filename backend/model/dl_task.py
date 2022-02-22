@@ -1,7 +1,7 @@
+from typing import List
 from abc import ABC, abstractmethod
 from backend.model.data_link import DataLink
 from backend.subproc.yt_dl import MediaURL, Resumer
-from typing import List
 
 
 class DlTask(ABC):

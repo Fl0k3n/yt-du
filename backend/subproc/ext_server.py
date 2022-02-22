@@ -1,12 +1,13 @@
 import asyncio
 import websockets
-from backend.utils.assets_loader import AssetsLoader as AL
-from collections import deque
-from backend.subproc.ipc.ipc_codes import ExtCodes
-from backend.subproc.ipc.message import Message, Messenger
-from multiprocessing.connection import Connection
 import threading
 import signal
+import atexit
+from collections import deque
+from multiprocessing.connection import Connection
+from backend.utils.assets_loader import AssetsLoader as AL
+from backend.subproc.ipc.ipc_codes import ExtCodes
+from backend.subproc.ipc.message import Message, Messenger
 
 
 class ExtServer:
@@ -19,7 +20,7 @@ class ExtServer:
             AL.get_env(val) for val in ['WS_PORT', 'WS_HOST', 'BROWSER']]
 
         self.server = websockets.serve(
-            self._on_connected, self.ADDRESS, self.PORT)
+            self._on_connected, self.ADDRESS, self.PORT, )
 
         self.tasks = deque()
         self.msger = Messenger()
@@ -31,7 +32,8 @@ class ExtServer:
         self.task_added = threading.Condition(self.tasks_mutex)
 
     async def _server(self, stop):
-        async with self.server:
+        async with self.server as server:
+            atexit.register(server.close)
             await stop
 
     def run(self):

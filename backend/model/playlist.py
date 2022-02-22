@@ -24,6 +24,7 @@ class Playlist(Downloadable):
 
         self.downloading_links: Set[PlaylistLink] = set()
         self.dling_count = 0
+        self.deleted = False
 
     def _setup_properties(self):
         super()._setup_properties()
@@ -50,6 +51,15 @@ class Playlist(Downloadable):
 
     def set_dl_speed_mbps(self, speed: float):
         self.dl_speed_mbps_property.set(speed)
+
+    def is_downloading(self) -> bool:
+        return self.dling_count > 0
+
+    def set_deleted(self):
+        self.deleted = True
+
+    def is_deleted(self) -> bool:
+        return self.deleted
 
     def get_downloading_links(self) -> Iterable[PlaylistLink]:
         return list(self.downloading_links)
@@ -180,14 +190,15 @@ class Playlist(Downloadable):
         if self.is_pausable():
             for link in self.playlist_links:
                 link.force_pause()
+            self.set_status(DataStatus.PAUSED)
 
-    def __hash__(self):
-        return hash(self.db_playlist.playlist_id)
+    # def __hash__(self):
+    #     return hash(self.db_playlist.playlist_id)
 
-    def __eq__(self, other):
-        if type(self) == type(other):
-            return self.db_playlist.playlist_id == other.db_playlist.playlist_id
-        return False
+    # def __eq__(self, other):
+    #     if type(self) == type(other):
+    #         return self.db_playlist.playlist_id == other.db_playlist.playlist_id
+    #     return False
 
     def create_video_path(self, title: str, playlist_idx: int = None) -> str:
         dir = Path(self.directory_path_property.get())

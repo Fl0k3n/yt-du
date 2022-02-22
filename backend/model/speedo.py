@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Set
+from typing import Dict, Set
 from collections import defaultdict
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from backend.model.playlist import Playlist

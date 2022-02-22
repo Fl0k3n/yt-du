@@ -9,11 +9,13 @@ from backend.controller.view_changer import DataViewChanger
 class MainWindow(QDialog):
     _BACK_MOUSE_BTN = 8
     _FWD_MOUSE_BTN = 16
+    _APP_NAME = 'yt-du'
 
     def __init__(self, data_list: DataSummaryBox, view_changer: DataViewChanger,
                  playlist_added_cmd: Command, close_command: Command):
         super().__init__()
-        self.setGeometry(200, 200, 800, 800)
+        self.setWindowTitle(self._APP_NAME)
+        self.setGeometry(200, 200, 920, 800)
         self.view_changer = view_changer
         self.close_command = close_command
 

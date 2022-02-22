@@ -1,11 +1,11 @@
+import threading
+import os
+from signal import SIGINT
 from typing import Any, Dict, Set, Tuple
-from backend.subproc.yt_dl import MediaURL, StatusObserver, UnsupportedURLError, create_media_url
+from backend.subproc.yt_dl import MediaURL, StatusObserver, create_media_url
 from backend.subproc.ipc.message import Message, Messenger, DlData
 from backend.subproc.ipc.ipc_codes import DlCodes
 from multiprocessing.connection import Connection
-import threading
-from signal import SIGINT
-import os
 
 
 class PipedStatusObserver(StatusObserver):

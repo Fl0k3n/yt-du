@@ -1,3 +1,4 @@
+from queue import Queue
 from backend.controller.app_closed_observer import AppClosedObserver
 from collections import defaultdict
 from typing import Dict, Iterable, List, Set
@@ -7,7 +8,6 @@ from backend.db.playlist_repo import PlaylistRepo
 from backend.model.playlist import Playlist
 from backend.model.playlist_link import PlaylistLink
 from backend.subproc.yt_dl import create_media_url, UnsupportedURLError
-from queue import Queue
 
 
 class Task:
@@ -89,6 +89,9 @@ class LinkCreator(AppClosedObserver):
 
     def _dlink_created(self, task: DoneTask):
         pl_link = task.pl_link
+
+        if pl_link.get_playlist().is_deleted():
+            return
 
         dlink = self.repo.create_data_link(
             pl_link, task.url, task.size, task.mime, task.expire)

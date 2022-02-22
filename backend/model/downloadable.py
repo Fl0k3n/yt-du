@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from re import L
 from backend.model.data_status import DataStatus
 from backend.model.downloadable_type import DownloadableType
 from backend.utils.property import Property

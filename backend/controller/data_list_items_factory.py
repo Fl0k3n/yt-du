@@ -26,6 +26,9 @@ class DataListItemsFactory:
         list_item.playlist_idx_property.bind(
             playlist_link.get_playlist_number_property().as_string())
 
+        list_item.directory_path_property.bind(
+            playlist_link.get_playlist().get_path_property())
+
         return list_item
 
     def _create_playlist_list_item(self, playlist: Playlist) -> PlaylistListItem:
@@ -43,6 +46,9 @@ class DataListItemsFactory:
             playlist.get_dl_speed_mbps_property().mapped_as(
                 Downloadable.get_formatted_dl_speed))
 
+        list_item.directory_path_property.bind(
+            playlist.get_path_property())
+
         return list_item
 
     def _init_downloadable_list_item(self, downloadable: Downloadable, data_list_item: DataListItem):
@@ -51,9 +57,6 @@ class DataListItemsFactory:
 
         data_list_item.status_property.bind(
             downloadable.get_status_property().as_string())
-
-        data_list_item.directory_path_property.bind(
-            downloadable.get_path_property())
 
         data_list_item.is_resumable_property.bind(
             downloadable.get_status_property().mapped_as(

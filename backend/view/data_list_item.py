@@ -1,10 +1,10 @@
-from typing import Dict, Iterable
-from backend.utils.property import Property
-from backend.utils.util import open_dir_in_explorer
+from typing import Dict, Iterable, List
 from PyQt5.QtCore import Qt
-from backend.utils.commands.command import CallRcvrCommand, Command
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QAction, QApplication, QFrame, QGridLayout, QMenu, QProgressBar, QWidget
+from backend.utils.property import Property
+from backend.utils.util import open_dir_in_explorer
+from backend.utils.commands.command import CallRcvrCommand, Command
 from backend.view.scrollable_label import ScrollableLabel
 
 
@@ -16,10 +16,6 @@ class DataListItem(QFrame):
 
         self._setup_default_properties()
 
-        self.show_details_command = None
-        self.pause_command = None
-        self.resume_command = None
-
         self._setup_gui_subcomponents()
 
         self._setup_status_label()
@@ -28,18 +24,22 @@ class DataListItem(QFrame):
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedSize(150, 30)
 
+        self.show_details_commands: List[Command] = []
+        self.resume_commands: List[Command] = []
+        self.pause_commands: List[Command] = []
+
         self.extra_menu_actions: Dict[str, QAction] = {}
 
         self._create_menu()
 
-    def set_show_details_command(self, cmd: Command):
-        self.show_details_command = cmd
+    def add_show_details_command(self, cmd: Command):
+        self.show_details_commands.append(cmd)
 
-    def set_pause_command(self, cmd: Command):
-        self.pause_command = cmd
+    def add_pause_command(self, cmd: Command):
+        self.pause_commands.append(cmd)
 
-    def set_resume_command(self, cmd: Command):
-        self.resume_command = cmd
+    def add_resume_command(self, cmd: Command):
+        self.resume_commands.append(cmd)
 
     def _setup_default_properties(self):
         # those properties should be public and bindable
@@ -83,8 +83,8 @@ class DataListItem(QFrame):
         self.progress_bar.setValue(v)
 
     def mouseDoubleClickEvent(self, a0: QtGui.QMouseEvent) -> None:
-        if self.show_details_command:
-            self.show_details_command.execute()
+        for cmd in self.show_details_commands:
+            cmd.execute()
 
         return super().mouseDoubleClickEvent(a0)
 
@@ -97,7 +97,7 @@ class DataListItem(QFrame):
         self.menu.addAction('Open Location').triggered.connect(
             lambda: open_dir_in_explorer(
                 self.directory_path_property.get(),
-                CallRcvrCommand(lambda: print('doesnt exist'))))
+                CallRcvrCommand(lambda: print(f'{self.directory_path_property.get()} doesnt exist'))))
 
         self.pause_action = self._create_pause_action(
         ) if self.is_pausable_property.get() else None
@@ -112,15 +112,20 @@ class DataListItem(QFrame):
             callback=lambda _, new: self._toggle_resume_action(new))
 
     def _create_pause_action(self) -> QAction:
-        return self._create_action('Pause', self.pause_command)
+        return self._create_action('Pause', self.pause_commands)
 
     def _create_resume_action(self) -> QAction:
-        return self._create_action('Resume', self.resume_command)
+        return self._create_action('Resume', self.resume_commands)
 
-    def _create_action(self, text: str, cmd: Command) -> QAction:
+    def _create_action(self, text: str, cmd_list: List[Command]) -> QAction:
         act = self.menu.addAction(text)
-        act.triggered.connect(lambda: cmd.execute()
-                              if cmd is not None else None)
+
+        def _run_cmds():
+            for cmd in cmd_list:
+                cmd.execute()
+
+        act.triggered.connect(_run_cmds)
+
         return act
 
     def add_menu_item(self, text: str, cmd: Command) -> QAction:

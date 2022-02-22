@@ -1,7 +1,6 @@
+from PyQt5.QtWidgets import QWidget
 from backend.utils.property import Property
 from backend.view.scrollable_label import ScrollableLabel
-from backend.utils.commands.command import Command
-from PyQt5.QtWidgets import QWidget
 from backend.view.data_list_item import DataListItem
 
 

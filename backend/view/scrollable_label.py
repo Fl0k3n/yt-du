@@ -1,6 +1,5 @@
-from PyQt5.QtWidgets import QFrame, QLabel, QWidget, QScrollArea
 from PyQt5.QtCore import Qt
-
+from PyQt5.QtWidgets import QFrame, QLabel, QWidget, QScrollArea
 from backend.utils.property import Property
 
 

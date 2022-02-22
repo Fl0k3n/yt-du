@@ -1,7 +1,7 @@
+from typing import List
 from backend.controller.playlists_summary_ctl import PlaylistsSummaryController
 from backend.controller.view_changed_observer import ViewChangedObserver
 from backend.controller.app_closed_observer import AppClosedObserver
-from typing import List
 from backend.db.playlist_repo import PlaylistRepo
 from backend.model.account import Account
 from backend.model.playlist_links_fetcher import PlaylistLinksFetcher
@@ -43,8 +43,12 @@ class MainWindowController(DataViewChanger):
             self.account, self.repo, self.playlist_fetcher,
             CallRcvrCommand(lambda: self.view.setDisabled(False)))
 
+        geo = self.view.geometry()
+        x = geo.x() + geo.width() / 2
+        y = geo.y() + geo.height() / 2
+
         self.view.setDisabled(True)
-        self.new_playlist_ctl.show()
+        self.new_playlist_ctl.show(x, y)
 
     def change_data_view(self, new_view: DataSummaryBox):
         self.view_stack.append(new_view)

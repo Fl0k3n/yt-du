@@ -25,6 +25,10 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         self.ipc_mgr = ipc_mgr
         self.speedo = speedo
 
+        self.account \
+            .get_playlists_observable_list() \
+            .add_on_changed_observer(on_removed_cb=self._on_playlist_deleted)
+
     def on_link_created(self, playlist_link: PlaylistLink, data_link: DataLink, playlist_rdy: bool):
         if playlist_rdy:
             playlist = playlist_link.get_playlist()
@@ -128,6 +132,9 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
     def on_process_finished(self, playlist_link: PlaylistLink, success: bool):
         # TODO
+        if playlist_link.get_playlist().is_deleted():
+            return
+
         old_status = playlist_link.get_status()
 
         if not success and old_status == DataStatus.WAIT_FOR_MERGE:  # fail on dl stage
@@ -157,6 +164,7 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
                 self._handle_inconsistent(playlist_link)
             elif playlist.is_finished():
                 playlist.set_status(DataStatus.FINISHED)
+                playlist.set_finished_at(datetime.datetime.now())
                 self.repo.update()
             elif playlist.is_paused():
                 playlist.set_status(DataStatus.PAUSED)
@@ -185,7 +193,7 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
         self._playlist_link_paused(playlist_link)
 
-        playlist = playlist_link.playlist
+        playlist = playlist_link.get_playlist()
 
         if playlist.is_paused():
             self.speedo.dl_stopped(playlist)
@@ -203,12 +211,14 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         self.repo.update()
 
     def on_playlist_pause_requested(self, playlist: Playlist):
+        print(f'pause requested for {playlist.get_name()}')
         playlist.set_pause_requested(True)
 
         for link in playlist.get_downloading_links():
             self.on_link_pause_requested(link)
 
     def on_link_pause_requested(self, playlist_link: PlaylistLink) -> bool:
+        print(f'pause requested for link {playlist_link.get_name()}')
         running = self.ipc_mgr.pause_dl(playlist_link.get_dl_task_id())
         playlist_link.set_pause_requested(True)
 
@@ -218,9 +228,11 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
         return running
 
     def on_link_resume_requested(self, playlist_link: PlaylistLink):
+        print(f'resume requested for link {playlist_link.get_name()}')
         self._resume_link(playlist_link)
 
     def on_playlist_resume_requested(self, playlist: Playlist):
+        print(f'resume requested for {playlist.get_name()}')
         playlist.set_resume_requested(True)
 
         for link in playlist.get_playlist_links():
@@ -239,6 +251,12 @@ class PlaylistDownloadSupervisor(PlaylistDlManager, LinkCreatedObserver, AppClos
 
     def _create_task(self, playlist_link: PlaylistLink) -> PlaylistLinkTask:
         return PlaylistLinkTask(playlist_link, self, self.link_renewer)
+
+    def _on_playlist_deleted(self, playlist: Playlist):
+        playlist.set_deleted()
+
+        if playlist.is_downloading() and not playlist.is_pause_requested():
+            self.on_playlist_pause_requested(playlist)
 
     def on_app_closed(self):
         for playlist in self.account.get_playlists():

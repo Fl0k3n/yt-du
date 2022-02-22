@@ -1,8 +1,7 @@
-from backend.model.data_status import DataStatus
+from pathlib import Path
+from typing import List, Set
 from backend.model.playlist_link import PlaylistLink
 from backend.subproc.yt_dl import Resumer
-from pathlib import Path
-from typing import Dict, List, Set
 
 
 class PlaylistLinkResumer(Resumer):

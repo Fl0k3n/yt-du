@@ -1,3 +1,6 @@
+import sys
+from typing import List
+from PyQt5.QtWidgets import QApplication
 from backend.controller.data_list_items_factory import DataListItemsFactory
 from backend.controller.playlists_summary_ctl import PlaylistsSummaryController
 from backend.db.playlist_repo import PlaylistRepo
@@ -7,9 +10,6 @@ from backend.model.link_renewer import LinkRenewer
 from backend.model.playlist_dl_supervisor import PlaylistDownloadSupervisor
 from backend.model.playlist_links_fetcher import PlaylistLinksFetcher
 from backend.model.speedo import Speedo
-import sys
-from typing import List
-from PyQt5.QtWidgets import QApplication
 from backend.db.db_session import DBSession
 from backend.controller.main_window_ctl import MainWindowController
 from backend.subproc.ipc.ipc_manager import IPCManager

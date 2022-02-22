@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from backend.model.data_link import DataLink
-
 from backend.model.playlist_link import PlaylistLink
 
 

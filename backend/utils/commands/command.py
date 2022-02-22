@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from PyQt5.QtWidgets import QLineEdit
+# TODO useless, refactor with simple callables
 
 
 class Command(ABC):
@@ -11,7 +11,7 @@ class Command(ABC):
 
 
 class CallRcvrCommand(Command):
-    def __init__(self, receiver: Callable[..., any], *args, **kwargs):
+    def __init__(self, receiver: Callable[..., Any], *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
         self.receiver = receiver

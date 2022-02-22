@@ -1,16 +1,16 @@
-from backend.model.link_fetched_observer import LinkFetchedObserver
-from typing import Any, Dict, List
+import threading
 import urllib.parse as parse
+import multiprocessing as mp
+from typing import Any, Dict, List
+from backend.model.link_fetched_observer import LinkFetchedObserver
 from backend.model.playlist_fetched_observer import PlaylistFetchedObserver
 from backend.model.playlist import Playlist
 from backend.model.playlist_link import PlaylistLink
 from backend.subproc.ipc.ipc_codes import ExtCodes
 from backend.subproc.ipc.message import Message, Messenger
-import multiprocessing as mp
 from backend.subproc.ext_server import run_server
 from backend.subproc.ipc.subproc_lifetime_observer import SubprocLifetimeObserver
 from backend.controller.app_closed_observer import AppClosedObserver
-import threading
 
 
 class ExtManager(AppClosedObserver):
@@ -41,7 +41,8 @@ class ExtManager(AppClosedObserver):
 
     def start(self):
         self.ext_conn, child_conn = mp.Pipe(duplex=True)
-        self.ext_proc = mp.Process(target=run_server, args=(child_conn,))
+        self.ext_proc = mp.Process(
+            target=run_server, args=(child_conn,), daemon=True)
         self.ext_proc.start()
         child_conn.close()
 

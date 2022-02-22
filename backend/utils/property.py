@@ -1,4 +1,3 @@
-
 from typing import Any, Callable, List, Set, Generic, TypeVar
 from backend.utils.property_changed_observer import PropertyChangedObserver
 
