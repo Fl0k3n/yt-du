@@ -1,6 +1,6 @@
 console.log('YTDU backgroud.js loaded');
 
-const PORT = 5568;
+const PORT = 5555;
 
 const HREFS_CODE = 1; // match with content.js codes
 
@@ -74,7 +74,8 @@ class ConnectionHandler {
         if (code == CODES.FETCH_PLAYLIST)
             this.playlistExtractor.addPlaylist(data['url'], msg_ob);
         else if (code == CODES.FETCH_LINK)
-            this.linkExtractor.addLink(data['url'], msg_ob, this.sendSingleLink);
+            this.linkExtractor.addLink(data['url'], msg_ob,
+                (link, datalinks, echo) => this.sendSingleLink(link, datalinks, echo));
         else if (code == CODES.PING)
             this.pingedBack = true;
         else
@@ -291,6 +292,7 @@ class PlaylistLinkExtractor {
                     chrome.tabs.remove(sender.tab.id);
 
                     const plData = this.linksMap.get(req.playlist);
+                    console.log(`pl data is ${plData} for ${req.playlist}`);
                     plData.allLinks = req.content.hrefs;
                     req.content.titles.forEach((title, idx) => {
                         this.link2title.set(plData.allLinks[idx], title);
@@ -310,6 +312,7 @@ class PlaylistLinkExtractor {
             return;
         }
 
+        console.log(`setting links of ${playlist}`);
         this.linksMap.set(playlist, {
             // those that are/were procecessed
             // url -> {

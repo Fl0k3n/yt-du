@@ -12,10 +12,14 @@ from backend.subproc.yt_dl import MediaURL, Resumer, YTDownloader
 from backend.subproc.ipc.piped_status_observer import PipedStatusObserver
 from backend.controller.app_closed_observer import AppClosedObserver
 from backend.subproc.ipc.stored_dl_task import StoredDlTask
+from backend.utils.assets_loader import AssetsLoader
 
 
 class DlManager(AppClosedObserver, LinkRenewedObserver):
-    _MAX_BATCH_DL = 10
+    try:
+        _MAX_BATCH_DL = AssetsLoader.get_env("MAX_DOWNLOAD_BATCH")
+    except:
+        _MAX_BATCH_DL = 10
 
     def __init__(self, msger: Messenger):
         self.msger = msger

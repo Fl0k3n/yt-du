@@ -7,3 +7,4 @@ merger*
 .tmp
 __pycache__
 .env
+smth.py

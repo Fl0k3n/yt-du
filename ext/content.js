@@ -34,12 +34,28 @@ async function fetchLinks(req) {
             ...req, content: {
                 hrefs: hrefs,
                 titles: titles
-            }
-            , success: true
+            },
+            success: true
         });
 
     } catch (err) {
         chrome.runtime.sendMessage({ ...req, success: false, reason: 'Failed to get playlist links ' + err });
+    }
+}
+
+
+async function fetchTitle(req) {
+    try {
+        const titleTag = await tryQS('.super-title + .title');
+        chrome.runtime.sendMessage({
+            ...req, content: {
+                hrefs: [window.location.href],
+                titles: [titleTag.textContent]
+            },
+            success: true
+        });
+    } catch (err) {
+        chrome.runtime.sendMessage({ ...req, success: false, reason: 'Failed to get title of playlist link ' + err });
     }
 }
 
@@ -54,7 +70,10 @@ chrome.runtime.onMessage.addListener(async (req, sender, resp) => {
 
     switch (req.code) {
         case HREFS_CODE:
-            await fetchLinks(req);
+            if (window.location.href.includes('list='))
+                await fetchLinks(req);
+            else
+                await fetchTitle(req);
             break;
         default:
             chrome.runtime.sendMessage({ ...req, success: false, reason: 'Unsupported task code' });

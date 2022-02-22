@@ -134,9 +134,12 @@ class ExtManager(AppClosedObserver):
         logging.critical(
             '{msg}\nEXTENSION HANDLER RCVD TASK BUT CONNECTION WITH BROWSER EXTENSION IS NOT ESTBABLISHED')
 
-    def _get_playlist_idx(self, url: str):
-        query = parse.urlparse(url).query
-        return int(parse.parse_qs(query)['index'][0])
+    def _get_playlist_idx(self, url: str) -> int:
+        if 'list=' in url:
+            query = parse.urlparse(url).query
+            return int(parse.parse_qs(query)['index'][0])
+        else:
+            return 1
 
     def on_app_closed(self):
         logging.info('ext manager cleaning up..')

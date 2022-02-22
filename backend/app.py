@@ -79,7 +79,7 @@ class App(QApplication):
 
 def main():
     logger_format = '[%(filename)s:%(lineno)d] %(levelname)-8s %(message)s'
-    logging.basicConfig(level=logging.INFO, format=logger_format)
+    logging.basicConfig(level=logging.DEBUG, format=logger_format)
     app = App(sys.argv, sql_debug=False)
     app.run()  # blocking on main window
     app.stop()

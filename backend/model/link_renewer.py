@@ -34,6 +34,7 @@ class LinkRenewer(LinkFetchedObserver):
 
     def query_renewed_links(self, playlist_link: PlaylistLink, data_link: DataLink,
                             task_id: int, link_idx: int, media_url: MediaURL, last_successful: str):
+        logging.debug(f'renew requested')
         self.renew_tasks[playlist_link].append((
             data_link, task_id, link_idx, media_url, last_successful))
         if playlist_link in self.pending_requests:
@@ -41,8 +42,10 @@ class LinkRenewer(LinkFetchedObserver):
 
         if playlist_link in self.renewed_links and \
                 media_url.get_mime() in self.renewed_links[playlist_link]:
+            logging.debug(f'checking task queue')
             self._handle_queue(playlist_link)
         else:
+            logging.debug(f'sending renew request')
             self.pending_requests.add(playlist_link)
             self.ipc_mgr.query_link(playlist_link)
 
