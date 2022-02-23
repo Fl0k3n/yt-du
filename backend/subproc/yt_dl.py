@@ -1,11 +1,11 @@
 """
-Module is independant of any external modules (excluding standard ones listed below),
-when used from another script user should create YTDownloader instance
-with appropriate StatusObserver instance for communication.
-Then download method should be called. If download should be resumed, user 
-has to provide appropriate Resumer object. If a link has expired and at least 1 renewed 
-media link is inconsistent entire data will be cleaned up and process will abort,
-user should restart the process with renewed data links.
+Module is independant of any external modules (excluding the standard ones listed below).
+When used from another script the user should create an YTDownloader instance
+with appropriate StatusObserver for communication.
+Then the YTDownloader.download() method should be called. If the download should be resumed, the user 
+has to provide the appropriate Resumer object. If a link has expired and at least 1 renewed 
+media link is inconsistent entire data will be cleaned up and the process will abort,
+the user should restart the process with renewed data links.
 
 Downloader downloads passed media links in separate threads, then merges them
 using ffmpeg subprocess, stderr of ffmpeg can be obtained.
@@ -304,7 +304,7 @@ def try_request(retries, func, *args, **kwargs):
 
 class ClenMediaURL(MediaURL):
     """representing urls of form:
-    https://r7---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627070421&ei=dcv6YJvXKZX5yQXW2pi4Cg&ip=185.25.121.191&id=o-AHkkLgbS2OUlsLPM2v8g0ZkUUXZFXCDjKKcyI1zCYWE3&itag=399&aitags=133%2C134%2C135%2C136%2C137%2C160%2C242%2C243%2C244%2C247%2C248%2C271%2C278%2C313%2C394%2C395%2C396%2C397%2C398%2C399%2C400%2C401&source=youtube&requiressl=yes&mh=wH&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fed&ms=au%2Crdu&mv=m&mvi=7&pl=24&initcwndbps=1245000&vprv=1&mime=video%2Fmp4&ns=4afvKawWCex7rzulWwKQk3oG&gir=yes&clen=32646474&dur=187.000&lmt=1627006227864114&mt=1627048609&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&txp=5531432&n=PcE-xKRRjcreiA&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRAIgdpEbK0XRz4Tt0zd1I4vhVHjOkS7OHaUx4m0-L7zjeScCIG6jwBUH7LVtGMCITc5zIaiMJx4vcAVclta5lQ8OYWa9&alr=yes&sig=AOq0QJ8wRQIhAK_Ktkbx3fx25Hd6qPRNJPucN-3jZXKgWkawTcjzg6lrAiB8uVRvdYmAwuHgbNbDBY5CKfhHVr2YjPmijy_H8xM-xw%3D%3D&cpn=LOfyYmu4lqM5ET_o&cver=2.20210721.00.00&range=0-489233&rn=1&rbuf=0
+    https://r7---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627070421&ei=...&ip=...&id=...&itag=...&aitags=...&source=youtube&requiressl=yes&mh=...&mn=...&mvi=7&pl=...&initcwndbps=...&vprv=1&mime=video%2Fmp4&ns=4afvKawWCex7rzulWwKQk3oG&gir=yes&clen=32646474&dur=187.000&lmt=...&mt=...&fvip=1&keepalive=yes&fexp=...&c=WEB&txp=...&n=...&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=...9&alr=...&sig=...&cpn=...&cver=2.20210721.00.00&range=0-489233&rn=1&rbuf=0
 
     i.e. it contains all of params:
     - expire, clen, mime, range
@@ -419,7 +419,7 @@ class ClenMediaURL(MediaURL):
 
 class SegmentedMediaURL(MediaURL):
     """representing urls of form:
-    https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627067155&ei=sr76YNvSOdXWyQWD6ofYCw&ip=185.25.121.191&id=o-ACU8i4GSks1YTq4VLKBpQ8OrUmiNqIrxBjEHzq8511CH&itag=135&aitags=133%2C134%2C135%2C160%2C242%2C243%2C244%2C278&source=yt_otf&requiressl=yes&mh=YV&mm=31%2C29&mn=sn-x2pm-f5fs%2Csn-u2oxu-f5fek&ms=au%2Crdu&mv=m&mvi=6&pl=24&initcwndbps=1415000&vprv=1&mime=video%2Fmp4&ns=pZ6KS-46thYZfqWHmJE9OuYG&otf=1&otfp=1&dur=0.000&lmt=1480857666340217&mt=1627045254&fvip=1&keepalive=yes&fexp=24001373%2C24007246&c=WEB&n=Q1G5m63zPxJShw&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AG3C_xAwRQIhAKesu1RO61XRpuKCvHVzOSW1d8lbAJIdEuob8H1tNuWYAiAgBZ1D9GudlCzh8LeS3xq5CMhjVIVP3Re_H8MimZfCfQ%3D%3D&alr=yes&sig=AOq0QJ8wRQIhAOMZIBa1p91KoQKh87PCaLh5_7Nkhy_N79APkwtxH64HAiA36LjF3JfL5w63muPKWJ7lNAQca74a9eLj0HB7FhIEgg%3D%3D&cpn=HMIEkbSZlgdAaZFf&cver=2.20210721.00.00&sq=0&rn=1&rbuf=0
+    https://r6---sn-x2pm-f5fs.googlevideo.com/videoplayback?expire=1627067155&ei=...&ip=...&id=...&itag=135&aitags=1...&source=yt_otf&requiressl=yes&mh=...&mm=...&mn=...&mv=m&mvi=6&pl=...&initcwndbps=...&vprv=1&mime=video%2Fmp4&ns=...&otf=1&otfp=1&dur=0.000&lmt=...&mt=...&fvip=1&keepalive=yes&fexp=...&c=WEB&n=...&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cvprv%2Cmime%2Cns%2Cotf%2Cotfp%2Cdur%2Clmt&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=...&alr=yes&sig=...&cpn=...&cver=2.20210721.00.00&sq=0&rn=1&rbuf=0
 
     i.e. it contains all of params:
     - expire, mime, sq
