@@ -17,7 +17,7 @@ from backend.utils.assets_loader import AssetsLoader
 
 class DlManager(AppClosedObserver, LinkRenewedObserver):
     try:
-        _MAX_BATCH_DL = AssetsLoader.get_env("MAX_DOWNLOAD_BATCH")
+        _MAX_BATCH_DL = int(AssetsLoader.get_env("MAX_DOWNLOAD_BATCH"))
     except:
         _MAX_BATCH_DL = 10
 

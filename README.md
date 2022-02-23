@@ -2,15 +2,13 @@
 
 ### Easy to use qBittorent-inspired application for downloading entire playlists or single videos from YouTube
 
-### Demo: <a href="todo">YouTube demo</a>
+### Demo: <a href="https://www.youtube.com/watch?v=Xr7d6p3E5n4">YouTube demo</a>
 
 <br/>
 
 ---
 
 ## What can you do with it?
-
----
 
 <br/>
 
@@ -19,10 +17,10 @@
 - manage the lifecycle of the download process, pause downloading of the entire playlists or selected videos, then resume it once convenient
 - have centralized database containing history and file system locations of your downloads
 - monitor speed and possible errors of the download process
-- resume download from the point when your network (or power, with some luck) went down without wasting time to download it from the beginning again
-- upload downloaded videos back to YouTube, but this time as private videos on your own account, taking advantage of YouTube infinite'ish video storage capabilities
+- resume the download from the point where your network (or power, with some luck) went down, without wasting time downloading it from the beginning again
+- upload downloaded videos back to YouTube, but this time as private videos on your own account, taking advantage of YouTube's infinite-ish video storage capabilities
 
- <br/>
+<br/>
 
 ---
 
@@ -35,7 +33,7 @@
 - requires Chrome browser running on owner's PC
 - it is still "work in progress", if you want to break it, you will likely succeed
 
- <br/>
+<br/>
 
 ---
 
@@ -43,43 +41,36 @@
 
 ## How does it work?
 
-<br/>
-
 ### High level overview
 
-When we click on a YouTube video 2 streams of data start flowing to the browser, first stream contains video, second contains audio, YouTube player manages those streams to play the media.
+When we click on a YouTube video, 2 streams of data start flowing to the browser. The first stream contains video, the second contains audio. The YouTube player manages those streams to play the media.
 
-Streams are sent via HTTP methods. Those methods have rich headers containing metadata which makes it possible to capture them and play without sophisticated YouTube player.
+Streams are sent via HTTP methods. Those methods have rich headers containing metadata, which makes it possible to capture and play them without a sophisticated YouTube player.
 
-YT-du uses the Chrome browser extension which uses the Chrome API to intercept those streams. Specifically, we need only endpoints to the first chunk of those streams, every succeding chunk can be generated from the previous one, which minimizes contribution of the browser.
+YT-du uses the Chrome browser extension, which uses the Chrome API to intercept those streams. Specifically, we need only endpoints to the first chunk of those streams; every succeeding chunk can be generated from the previous one, which minimizes the contribution of the browser.
 
-Sidenote: As far as I managed to find out <a href="https://github.com/ytdl-org/youtube-dl">youtube-dl</a> extracts those streams by emulating browser (parsing and running JS code from desktop). Here different approach had been taken, which makes it easier to use at a cost of limited extendibility.
- 
+Sidenote: As far as I managed to find out, <a href="https://github.com/ytdl-org/youtube-dl">youtube-dl</a> extracts those streams by emulating browser (parsing and running JS code from desktop). Here, a different approach has been taken, which makes it easier to use at the cost of limited extendibility.
+
 <br/>
-
----
-
- <br/>
 
 Workflow of the download process:
 
-1. User passes url of playlist (or video, which is similar, lets focus on playlists here) to the Yt-du client
-2. YT-du client commands manager of the browser extension to fetch url's of above-mentioned streams for every video in the playlist
-3. Manager preprocesses these commands and sends them to browser extension using websockets
-4. Browser Extension opens link to the playlist, from which it extracts links to videos in that playlists, then for each video links 1 Chrome tab is opened from which extension intercepts required media stream urls
-5. Browser Extension sends intercepted urls back to the YT-du client. At this point we have everything that's necessary for the download
-6. YT-du client contacts process manager to schedule download-workers to download every video in playlist, number of parallel downloads can be configured
-7. YT-du download-worker starts the download process, generating urls to the next chunks of the media streams
-8. YT-du download-worker sends informations about the download process to the YT-du client, client uses that data to update GUI, client can stop the download-worker at any time which leaves downloaded data consistent
-9. Once audio and video streams are downloaded YT-du download-worker merges them using ffmpeg subprocess, creating video that we can watch on the YouTube platform
-10. YT-du download worker saves that video in a file system location specified by the user
+1. The user enters the url of the playlist (or video, which is similar; let's focus on playlists here) to the Yt-du client.
+2. YT-du client commands the manager of the browser extension to fetch the url's of the above-mentioned streams for every video in the playlist.
+3. The manager preprocesses these commands and sends them to the browser extension using websockets.
+4. The browser extension opens a link to the playlist, from which it extracts links to videos in that playlist; for each video link, one Chrome tab is opened, from which the extension intercepts required media stream urls.
+5. Browser Extension sends intercepted urls back to the YT-du client. At this point, we have everything that's necessary for the download.
+6. YT-du client contacts the process manager to schedule download-workers to download every video in the playlist. The number of parallel downloads can be configured.
+7. YT-du download-worker starts the download process, generating urls to the next chunks of the media streams.
+8. YT-du download-worker sends information about the download process to the YT-du client. The client uses that data to update the GUI. The client can stop the download-worker at any time, which leaves the downloaded data consistent.
+9. Once audio and video streams are downloaded, YT-du download-worker merges them using an ffmpeg subprocess, creating a video that we can watch on the YouTube platform.
+10. The YT-du download worker saves that video in a file system location specified by the user.
 
- <br/>
-
+<br/>
 
 ---
 
- <br/>
+<br/>
 
 ### Low level overview (TODO)
 
@@ -99,7 +90,6 @@ Workflow of the download process:
 
 ## The "u" upload part of the YT-du
 
-
 It is still work in progress (I planned to use YouTube API here but quota is ridiculous). For now you can upload videos by:
 
 1. open <a href="https://studio.youtube.com/">youtube studio</a>
@@ -113,14 +103,14 @@ It is still work in progress (I planned to use YouTube API here but quota is rid
 
 ---
 
- <br/>
+<br/>
 
 ## Installation
 
 ### 1. Download requirements:
 - postgresql, follow instructions from <a href="https://www.postgresql.org/download/">here</a>, then <a href="https://ubiq.co/database-blog/create-user-postgresql/">create user</a> with full priviliges, finally <a href="https://www.postgresql.org/docs/8.4/tutorial-createdb.html">create database</a>, or use <a href="https://hub.docker.com/_/postgres"> docker</a>, pull version 12.x
 - ffmpeg 4.x, follow instructions from <a href="https://ffmpeg.org/download.html">here</a>
-- make sure that python and pip are installed, then in main repo directory run:
+- make sure that python3.8 and pip are installed, then in main repo directory run:
 ```
     python -m venv env
     source ./env/bin/activate

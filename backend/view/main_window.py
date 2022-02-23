@@ -9,7 +9,7 @@ from backend.controller.view_changer import DataViewChanger
 class MainWindow(QDialog):
     _BACK_MOUSE_BTN = 8
     _FWD_MOUSE_BTN = 16
-    _APP_NAME = 'yt-du'
+    _APP_NAME = 'YT-du'
 
     def __init__(self, data_list: DataSummaryBox, view_changer: DataViewChanger,
                  playlist_added_cmd: Command, close_command: Command):

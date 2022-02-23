@@ -1,6 +1,6 @@
 console.log('YTDU backgroud.js loaded');
 
-const PORT = 5555;
+const PORT = 5556;
 
 const HREFS_CODE = 1; // match with content.js codes
 

@@ -10,13 +10,14 @@ class NewPlaylistWindow(QDialog):
     _DEFAULT_OUT_PATH = AL.get_env('DEFAULT_OUT_PATH')
     _WIDTH = 600
     _HEIGHT = 400
+    _WINDOW_TITLE = 'download'
 
     def __init__(self, x: int, y: int, on_view_closed: Command, on_accepted: Command):
         super().__init__()
         self.on_view_closed = on_view_closed
         self.setGeometry(x - self._WIDTH // 2, y -
                          self._HEIGHT // 2, self._WIDTH, self._HEIGHT)
-
+        self.setWindowTitle(self._WINDOW_TITLE)
         self.layout = QVBoxLayout(self)
 
         options_box = QWidget()
